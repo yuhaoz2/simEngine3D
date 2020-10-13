@@ -3,7 +3,7 @@ nb = 2;
 % body 1
 body(1).id = 1;
 r_0 = [0, sqrt(2), -sqrt(2)]';
-p_0 = [0.6533, 0.2706, 0.6533, 0.2706]';
+p_0 = [0.653281482438188, 0.270598050073099, 0.653281482438188, 0.270598050073099]';
 body(1).q_0 = [r_0; p_0];
 dr_0 = [0, 0, 0]';
 dp_0 = [0, 0, 0, 0]';
@@ -63,8 +63,8 @@ constraints(5).ddf = @(t)(0*t);
 
 % driving constraint
 constraints(6).type = "DP1";
-constraints(6).a_i_bar = [1, 0, 0]';
+constraints(6).a_i_bar = [0, 1, 0]';
 constraints(6).a_j_bar =[0, 0, -1]';
-constraints(6).f = @(t)(cos(pi/4*cos(2*t)));
-constraints(6).df = @(t)((pi*sin(2*t)*sin((pi*cos(2*t))/4))/2);
-constraints(6).ddf = @(t)(pi*cos(2*t)*sin((pi*cos(2*t))/4) - (pi^2*sin(2*t)^2*cos((pi*cos(2*t))/4))/4);
+constraints(6).f = @(t)cos((pi/2)+(pi/4)*cos(2*t));
+constraints(6).df = @(t)((pi*sin(2*t)*sin(pi/2 + (pi*cos(2*t))/4))/2);
+constraints(6).ddf = @(t)(pi*cos(2*t)*sin(pi/2 + (pi*cos(2*t))/4) - (pi^2*sin(2*t)^2*cos(pi/2 + (pi*cos(2*t))/4))/4);
