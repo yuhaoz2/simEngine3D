@@ -1,62 +1,70 @@
+% Define number of bodies
+nb = 2;
 % body 1
-i = 1;
-r_i_0 = [0, sqrt(2), -sqrt(2)]';
-p_i_0 = [0.6533, 0.2706, 0.6533, 0.2706]';
-q_i_0 = [r_i_0; p_i_0];
-dr_i_0 = [0, 0, 0]';
-dp_i_0 = [0, 0, 0, 0]';
-dq_i_0 = [dr_i_0; dp_i_0];
+body(1).id = 1;
+r_0 = [0, sqrt(2), -sqrt(2)]';
+p_0 = [0.6533, 0.2706, 0.6533, 0.2706]';
+body(1).q_0 = [r_0; p_0];
+dr_0 = [0, 0, 0]';
+dp_0 = [0, 0, 0, 0]';
+body(1).dq_0 = [dr_0; dp_0];
 
 % ground
-j = 0;
-q_j_0 = [];
-dq_j_0 = [];
+body(2).id = 0;
+body(2).q_0 = [0 0 0 1 0 0 0]';
+body(2).dq_0 = [0 0 0 0 0 0 0]';
 
-syms f(t);
-
+% Define number of constaints
+nc = 6;
 % 3 CD constraints
 % constraint 1
-c_1 = [1, 0, 0]';
-s_i_P_bar_1 = [-2, 0, 0]';
-s_j_Q_bar_1 =[0, 0, 0]';
-f_1 = 0;
-df_1 = 0;
-ddf_1 = 0;
+constraints(1).type = "CD";
+constraints(1).c = [1, 0, 0]';
+constraints(1).s_i_P_bar = [-2, 0, 0]';
+constraints(1).s_j_Q_bar =[0, 0, 0]';
+constraints(1).f = @(t)(0*t);
+constraints(1).df = @(t)(0*t);
+constraints(1).ddf = @(t)(0*t);
 
 % constraint 2
-c_2 = [0, 1, 0]';
-s_i_P_bar_2 = [-2, 0, 0]';
-s_j_Q_bar_2 =[0, 0, 0]';
-f_2 = 0;
-df_2 = 0;
-ddf_2 = 0;
+constraints(2).type = "CD";
+constraints(2).c = [0, 1, 0]';
+constraints(2).s_i_P_bar = [-2, 0, 0]';
+constraints(2).s_j_Q_bar =[0, 0, 0]';
+constraints(2).f = @(t)(0*t);
+constraints(2).df = @(t)(0*t);
+constraints(2).ddf = @(t)(0*t);
 
 % constraint 3
-c_3 = [0, 0, 1]';
-s_i_P_bar_3 = [-2, 0, 0]';
-s_j_Q_bar_3 =[0, 0, 0]';
-f_3 = 0;
-df_3 = 0;
-ddf_3 = 0;
+constraints(3).type = "CD";
+constraints(3).c = [0, 0, 1]';
+constraints(3).s_i_P_bar = [-2, 0, 0]';
+constraints(3).s_j_Q_bar =[0, 0, 0]';
+constraints(3).f = @(t)(0*t);
+constraints(3).df = @(t)(0*t);
+constraints(3).ddf = @(t)(0*t);
 
 % 2 DP1 constraints
 % constraint 4
-a_i_bar_4 = [1, 0, 0]';
-a_j_bar_4 =[1, 0, 0]';
-f_4 = 0;
-df_4 = 0;
-ddf_4 = 0;
+constraints(4).type = "DP1";
+constraints(4).a_i_bar = [1, 0, 0]';
+constraints(4).a_j_bar =[1, 0, 0]';
+constraints(4).f = @(t)(0*t);
+constraints(4).df = @(t)(0*t);
+constraints(4).ddf = @(t)(0*t);
 
 % constraint 5
-a_i_bar_5 = [0, 1, 0]';
-a_j_bar_5 =[1, 0, 0]';
-f_5 = 0;
-df_5 = 0;
-ddf_5 = 0;
+constraints(5).type = "DP1";
+constraints(5).a_i_bar = [0, 1, 0]';
+constraints(5).a_j_bar =[1, 0, 0]';
+constraints(5).f = @(t)(0*t);
+constraints(5).df = @(t)(0*t);
+constraints(5).ddf = @(t)(0*t);
 
 % driving constraint
-a_i_bar_6 = [1, 0, 0]';
-a_j_bar_6 =[0, 0, -1]';
-f(t) = cos(pi/4*cos(2*t));
-df = diff(f,t);
-ddf = diff(df,t);
+constraints(6).type = "DP1";
+constraints(6).a_i_bar = [1, 0, 0]';
+constraints(6).a_j_bar =[0, 0, -1]';
+constraints(6).f = @(t)(cos(pi/4*cos(2*t)));
+constraints(6).df = @(t)((pi*sin(2*t)*sin((pi*cos(2*t))/4))/2);
+constraints(6).ddf = @(t)(pi*cos(2*t)*sin((pi*cos(2*t))/4) - (pi^2*sin(2*t)^2*cos((pi*cos(2*t))/4))/4);
