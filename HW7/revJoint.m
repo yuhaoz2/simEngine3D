@@ -1,5 +1,6 @@
 % Define number of bodies
 nb = 2;
+
 % body 1
 body(1).id = 1;
 r_0 = [0, sqrt(2), -sqrt(2)]';
@@ -8,6 +9,11 @@ body(1).q_0 = [r_0; p_0];
 dr_0 = [0, 0, 0]';
 dp_0 = [0, 0, 0, 0]';
 body(1).dq_0 = [dr_0; dp_0];
+
+body(1).mass = 7800*4*0.05*0.05;
+body(1).inertia = [body(1).mass/12*2*0.05^2 0 0;...
+                   0 body(1).mass/12*(4^2+0.05^2) 0;...
+                   0 0 body(1).mass/12*(4^2+0.05^2)];
 
 % ground
 body(2).id = 0;
