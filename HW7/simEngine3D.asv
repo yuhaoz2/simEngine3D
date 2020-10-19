@@ -110,6 +110,7 @@ classdef simEngine3D < handle
           this.gamma = [this.gamma;gamma_euler];
       end
       
+      
       function states = kinematic_analysis(this,t_start,t_step,t_end)
           % perform kinematic analysis
 
@@ -216,6 +217,11 @@ classdef simEngine3D < handle
           end
       end
       
+      
+      function position_analysis(this)
+          
+      end
+      
       function torques = inverse_dynamics(this,t_start,t_step,t_end)
           % compute the torques you need to get the prescribed motion via
           % inverse dynamics analysis
@@ -241,13 +247,36 @@ classdef simEngine3D < handle
           J_p = zeros(4*(this.nb-1),4*(this.nb-1)); % -1 because body 2 is ground
           for k = 1:this.nb-1
              G = p2A(this.p_i); % need to update when there are more bodies
-             J_p(4*k-3:4*k, 4*k-3:4*k) = 4*G'*this.body(k).inertia;
+             J_p(4*k-3:4*k, 4*k-3:4*k) = 4*G'*this.body(k).inertia*G;
          end
       end
           
-     
-      
+      function P = computeP(this)
+          % compute the P matrix
+          P = zeros(this.nb-1,4*(this.nb-1));
+          for k = 1:this.nb-1
+              P(k, 4*k-3:4*k) = this.p_i'; % need to update when there are more bodies
+          end
       end
-
+         
+      function F = computeF(this)
+          % compute the F vector
+          F = zeros(3*(this.nb-1),1);
+          for k = 1:this.nb-1
+              F(3*k-2:3*k) = this.body(k).force; % total force acting on each body
+          end
+      end
+      
+      function tau_caret = compute_tau_caret(this)
+          % compute the tau_caret vector
+          tau_caret = zeros(4*(this.nb-1),1);
+          for k = 1:this.nb-1
+              G = p2A(this.p_i); % need to update when there are more bodies
+              dG = p2A(this.dp_i); % need to update when there are more bodies
+              tau_caret(4*k-3:4*k) = 2*G'*this.body(k).torque + 8*dG'*this.body(k).inertia*dG*this.p_i; % total torque acting on each body
+          end
+      end
+      
     end
+    
 end
