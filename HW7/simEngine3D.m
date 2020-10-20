@@ -245,11 +245,11 @@ classdef simEngine3D < handle
               
               % STEP 1: solve for ddr and ddp
               
-              if time > t_start
+              %if time > t_start
                   this.position_analysis();
                   this.velocity_analysis();
                   this.acceleration_analysis();
-              end
+              %end
               
               % STEP 2: solve for lagrange multiplier
               
