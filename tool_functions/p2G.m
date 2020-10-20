@@ -10,4 +10,4 @@ e_0 = p(1);
 
 G = [-e, -cross_matrix(e)+e_0*eye(3)];
 
-ened
+end

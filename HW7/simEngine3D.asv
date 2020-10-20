@@ -122,93 +122,9 @@ classdef simEngine3D < handle
               this.t = time; % update system time
               
               if time > t_start
-                  eps = 1e-6; % tolerance
-                  itCountMax =20; % max iteration
-                  if this.j~=0 % bodi j is not ground
-                      % solve for position
-                      new_q = [this.q_i;this.q_j];
-                      for h=1:itCountMax
-                          this.compute_cons();
-                          delta_q = this.Phi_q\this.Phi;
-                          new_q =new_q - delta_q;
-                          
-                          this.q_i = new_q(1:7);
-                          this.q_j = new_q(8:14);
-                          this.r_i=this.q_i(1:3);
-                          this.p_i=this.q_i(4:7);
-                          this.r_j=this.q_j(1:3);
-                          this.p_j=this.q_j(4:7);
-                          
-                          if norm(delta_q) < eps %check for convergence
-                              break;
-                          end
-                      end
-                      
-                      if h >= itCountMax
-                          error('Maximum number of iterations reached');
-                      end
-                      
-                      % solve for velocity
-                      this.compute_cons();
-                      new_dq = this.Phi_q\this.nu;
-                      
-                      this.dq_i = new_dq(1:7);
-                      this.dq_j = new_dq(8:14);
-                      this.dr_i=this.dq_i(1:3);
-                      this.dp_i=this.dq_i(4:7);
-                      this.dr_j=this.dq_j(1:3);
-                      this.dp_j=this.dq_j(4:7);
-                      
-                      % solve for acceleration
-                      this.compute_cons();
-                      new_ddq = this.Phi_q\this.gamma;
-                      
-                      this.ddq_i = new_ddq(1:7);
-                      this.ddq_j = new_ddq(8:14);
-                      this.ddr_i=this.ddq_i(1:3);
-                      this.ddp_i=this.ddq_i(4:7);
-                      this.ddr_j=this.ddq_j(1:3);
-                      this.ddp_j=this.ddq_j(4:7);
-                      
-                  else
-                      
-                      % solve for position
-                      new_q = this.q_i;
-                      for h=1:itCountMax
-                          this.compute_cons();
-                          delta_q = this.Phi_q\this.Phi;
-                          new_q =new_q - delta_q;
-                          
-                          this.q_i = new_q(1:7);
-                          this.r_i=this.q_i(1:3);
-                          this.p_i=this.q_i(4:7);
-                          
-                          if norm(delta_q) < eps %check for convergence
-                              break;
-                          end
-                      end
-                      
-                      if h >= itCountMax
-                          error('Maximum number of iterations reached');
-                      end
-                      
-                      % solve for velocity
-                      this.compute_cons();
-                      new_dq = this.Phi_q\this.nu;
-                      
-                      this.dq_i = new_dq(1:7);
-                      this.dr_i=this.dq_i(1:3);
-                      this.dp_i=this.dq_i(4:7);
-                      
-                      % solve for acceleration
-                      this.compute_cons();
-                      new_ddq = this.Phi_q\this.gamma;
-                      
-                      this.ddq_i = new_ddq(1:7);
-                      this.ddr_i=this.ddq_i(1:3);
-                      this.ddp_i=this.ddq_i(4:7);
-                  end
-                  %disp(['t = ' num2str(time) ' sec.']);
+                  this.position_analysis();
+                  this.velocity_analysis();
+                  this.acceleration_analysis();
               end
               states{k}.time = this.t;
               states{k}.q = [this.q_i;this.q_j];
@@ -219,7 +135,101 @@ classdef simEngine3D < handle
       
       
       function position_analysis(this)
+          % Kinematic Analysis Stage 1
           
+          eps = 1e-6; % tolerance
+          itCountMax =20; % max iteration
+          
+          if this.j~=0 % bodi j is not ground
+              % solve for position
+              new_q = [this.q_i;this.q_j];
+              for h=1:itCountMax
+                  this.compute_cons();
+                  delta_q = this.Phi_q\this.Phi;
+                  new_q =new_q - delta_q;
+                  
+                  this.q_i = new_q(1:7);
+                  this.q_j = new_q(8:14);
+                  this.r_i=this.q_i(1:3);
+                  this.p_i=this.q_i(4:7);
+                  this.r_j=this.q_j(1:3);
+                  this.p_j=this.q_j(4:7);
+                  
+                  if norm(delta_q) < eps %check for convergence
+                      break;
+                  end
+              end
+              
+              if h >= itCountMax
+                  error('Maximum number of iterations reached');
+              end
+          else %  bodi j is ground
+              new_q = this.q_i;
+              for h=1:itCountMax
+                  this.compute_cons();
+                  delta_q = this.Phi_q\this.Phi;
+                  new_q =new_q - delta_q;
+                  
+                  this.q_i = new_q(1:7);
+                  this.r_i=this.q_i(1:3);
+                  this.p_i=this.q_i(4:7);
+                  
+                  if norm(delta_q) < eps %check for convergence
+                      break;
+                  end
+              end
+              
+              if h >= itCountMax
+                  error('Maximum number of iterations reached');
+              end
+          end
+      end
+      
+      function velocity_analysis(this)
+          % Kinematic Analysis Stage 2
+          
+          if this.j~=0 % bodi j is not ground
+              this.compute_cons();
+              new_dq = this.Phi_q\this.nu;
+              
+              this.dq_i = new_dq(1:7);
+              this.dq_j = new_dq(8:14);
+              this.dr_i=this.dq_i(1:3);
+              this.dp_i=this.dq_i(4:7);
+              this.dr_j=this.dq_j(1:3);
+              this.dp_j=this.dq_j(4:7);
+          else %  bodi j is ground
+              this.compute_cons();
+              new_dq = this.Phi_q\this.nu;
+              
+              this.dq_i = new_dq(1:7);
+              this.dr_i=this.dq_i(1:3);
+              this.dp_i=this.dq_i(4:7);
+              
+          end
+      end
+      
+      function acceleration_analysis(this)
+          % Kinematic Analysis Stage 3
+          
+          if this.j~=0 % bodi j is not ground
+              this.compute_cons();
+              new_ddq = this.Phi_q\this.gamma;
+              
+              this.ddq_i = new_ddq(1:7);
+              this.ddq_j = new_ddq(8:14);
+              this.ddr_i=this.ddq_i(1:3);
+              this.ddp_i=this.ddq_i(4:7);
+              this.ddr_j=this.ddq_j(1:3);
+              this.ddp_j=this.ddq_j(4:7);
+          else %  bodi j is ground
+              this.compute_cons();
+              new_ddq = this.Phi_q\this.gamma;
+              
+              this.ddq_i = new_ddq(1:7);
+              this.ddr_i=this.ddq_i(1:3);
+              this.ddp_i=this.ddq_i(4:7);
+          end
       end
       
       function torques = inverse_dynamics(this,t_start,t_step,t_end)
@@ -228,6 +238,47 @@ classdef simEngine3D < handle
           
           counts = length(t_start:t_step:t_end);
           torques = cell(counts,1);% store torques at each step
+          
+          for k = 1:counts
+              time = t_start + (k-1)*t_step;
+              this.t = time; % update system time
+              
+              % STEP 1: solve for ddr and ddp
+              
+              if time > t_start
+                  this.position_analysis();
+                  this.velocity_analysis();
+                  this.acceleration_analysis();
+              end
+              
+              % STEP 2: solve for lagrange multiplier
+              
+              % Compute the needed matrices
+              this.compute_cons();
+              M = this.computeM();
+              J_p = this.computeJ_p();
+              P = this.computeP();
+              F = this.computeF();
+              tau_caret = this.compute_tau_caret();
+              Phi_r = this.Phi_q(:,1:3*(this.nb-1));
+              Phi_p = this.Phi_q(:,3*(this.nb-1)+1:end);
+              
+              % Build the matrix for inverse dynamics
+              % Left
+              L = [zeros(3*(this.nb-1),this.nb-1) Phi_r';...
+                   P' Phi_p']; 
+              %right
+              R = -[M*this.ddr_i - F;...
+                    J_p*ddp_i - tau_caret];  % need to update when there are more bodies
+                
+              lambda_comb = L\R;
+              lambda_p = lambda_comb(1:this.nb-1);
+              lambda = lambda_comb(this.nb);
+              
+              % STEP 3: recover the forces/torques
+              
+          end
+      end
           
       end
       

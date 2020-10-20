@@ -239,6 +239,53 @@ classdef simEngine3D < handle
           counts = length(t_start:t_step:t_end);
           torques = cell(counts,1);% store torques at each step
           
+          for k = 1:counts
+              time = t_start + (k-1)*t_step;
+              this.t = time; % update system time
+              
+              % STEP 1: solve for ddr and ddp
+              
+              if time > t_start
+                  this.position_analysis();
+                  this.velocity_analysis();
+                  this.acceleration_analysis();
+              end
+              
+              % STEP 2: solve for lagrange multiplier
+              
+              % Compute the needed matrices
+              this.compute_cons();
+              M = this.computeM();
+              J_p = this.computeJ_p();
+              P = this.computeP();
+              F = this.computeF();
+              tau_caret = this.compute_tau_caret();
+              Phi_r = this.Phi_q(:,1:3*(this.nb-1));
+              Phi_p = this.Phi_q(:,3*(this.nb-1)+1:end);
+              
+              % Build the matrix for inverse dynamics
+              % Left
+              L = [zeros(3*(this.nb-1),this.nb-1) Phi_r';...
+                   P' Phi_p']; 
+              %right
+              R = -[M*this.ddr_i - F;...
+                    J_p*this.ddp_i - tau_caret];  % need to update when there are more bodies
+                
+              lambda_comb = L\R;
+              lambda_p = lambda_comb(1:this.nb-1);
+              lambda = lambda_comb(this.nb:end);
+                                        
+              % STEP 3: recover the forces/torques
+              
+              torques{k} = cell(this.nc,this.nb-1);
+              for h = 1:this.nb-1
+                  Phi_p_h = Phi_p(:,(4*h-3):4*h);
+                  G = p2G(this.p_i); % need to update when there are more bodies
+                  for hh = 1:this.nc
+                      torques{k}{hh,h} = -1/2*G*Phi_p_h(hh,:)'*lambda(hh);
+                  end
+              end
+          end
       end
       
       
@@ -256,7 +303,7 @@ classdef simEngine3D < handle
           % compute the inertia matrix
           J_p = zeros(4*(this.nb-1),4*(this.nb-1)); % -1 because body 2 is ground
           for k = 1:this.nb-1
-             G = p2A(this.p_i); % need to update when there are more bodies
+             G = p2G(this.p_i); % need to update when there are more bodies
              J_p(4*k-3:4*k, 4*k-3:4*k) = 4*G'*this.body(k).inertia*G;
          end
       end
@@ -281,8 +328,8 @@ classdef simEngine3D < handle
           % compute the tau_caret vector
           tau_caret = zeros(4*(this.nb-1),1);
           for k = 1:this.nb-1
-              G = p2A(this.p_i); % need to update when there are more bodies
-              dG = p2A(this.dp_i); % need to update when there are more bodies
+              G = p2G(this.p_i); % need to update when there are more bodies
+              dG = p2G(this.dp_i); % need to update when there are more bodies
               tau_caret(4*k-3:4*k) = 2*G'*this.body(k).torque + 8*dG'*this.body(k).inertia*dG*this.p_i; % total torque acting on each body
           end
       end

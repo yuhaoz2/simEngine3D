@@ -15,6 +15,10 @@ body(1).inertia = [body(1).mass/12*2*0.05^2 0 0;...
                    0 body(1).mass/12*(4^2+0.05^2) 0;...
                    0 0 body(1).mass/12*(4^2+0.05^2)];
 
+g = [0;0;-9.81];               
+body(1).force = body(1).mass*g;
+body(1).torque = [0 0 0]';
+
 % ground
 body(2).id = 0;
 body(2).q_0 = [0 0 0 1 0 0 0]';
