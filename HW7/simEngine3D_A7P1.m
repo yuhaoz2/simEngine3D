@@ -24,4 +24,4 @@ plot(t,torque);
 title('Torque applied to pendulum');
 xlabel('Time (sec)');
 ylabel('Torque (Nm)');
-legend('T_ xy','T_ xz','T_ yz');
+legend('T_z','T_y','T_x');
