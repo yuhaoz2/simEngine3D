@@ -128,8 +128,9 @@ for k=1:length(h)
     error_BDF(k) = abs(y(end)-y_10);
 end
 
+% Plots
+
 figure
-%plot(log(h),log(error_BE),'r',log(h),log(error_BDF),'b');
 subplot(2,1,1)
 plot(h,error_BE);
 title('Backward Euler convergence plot');
