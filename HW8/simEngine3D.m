@@ -487,8 +487,9 @@ classdef simEngine3D < handle
           
           %%% Stage 0: prime new time step %%%
           
-          this.ddr_i   = s1.ddr;
-          this.ddp_i   = s1.ddp;
+          this.ddr_i = s1.ddr;
+          this.ddp_i = s1.ddp;
+          this.ddq_i = [this.ddr_i;this.ddp_i];
           this.lambda_p = s1.lambda_p;
           this.lambda  = s1.lambda;
           
@@ -500,6 +501,8 @@ classdef simEngine3D < handle
               this.dr_i = C_r_dot + beta*h*this.ddr_i;
               this.p_i = C_p + beta^2*h^2*this.ddp_i;
               this.dp_i = C_p_dot + beta*h*this.ddp_i;
+              this.q_i = [this.r_i;this.p_i];
+              this.dq_i = [this.dr_i;this.dp_i];
               
               %%% Stage 2: compute the residual %%%
               
@@ -527,12 +530,13 @@ classdef simEngine3D < handle
                         Phi_r  Phi_p  zeros(this.nc,(this.nb-1))  zeros(this.nc) ]; % approximate the Jacobian
               end
               
-              delta = -Psi\g;
+              delta = Psi\-g;
               
               %%% Stage 4: improve the quality of approximate solution %%%
               
               this.ddr_i   = this.ddr_i + delta(1:3*(this.nb-1));
               this.ddp_i   = this.ddp_i + delta(3*(this.nb-1)+1:7*(this.nb-1));
+              this.ddq_i = [this.ddr_i;this.ddp_i];
               this.lambda_p = this.lambda_p + delta(7*(this.nb-1)+1:8*(this.nb-1));
               this.lambda  = this.lambda + delta(8*(this.nb-1)+1:end);
               
@@ -554,6 +558,8 @@ classdef simEngine3D < handle
           this.p_i     = C_p + beta^2*h^2*this.ddp_i;
           this.dr_i  = C_r_dot + beta*h*this.ddr_i;
           this.dp_i  = C_p_dot + beta*h*this.ddp_i;
+          this.q_i = [this.r_i;this.p_i];
+          this.dq_i = [this.dr_i;this.dp_i];
           
       end
       
