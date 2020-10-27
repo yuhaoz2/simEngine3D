@@ -260,8 +260,8 @@ classdef simEngine3D < handle
               P = this.computeP();
               F = this.computeF();
               tau_caret = this.compute_tau_caret();
-              Phi_r = this.Phi_q(:,1:3*(this.nb-1));
-              Phi_p = this.Phi_q(:,3*(this.nb-1)+1:end);
+              Phi_r = this.Phi_q(1:this.nc,1:3*(this.nb-1));
+              Phi_p = this.Phi_q(1:this.nc,3*(this.nb-1)+1:end);
               
               % Build the matrix for inverse dynamics
               % Left

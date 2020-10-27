@@ -262,8 +262,8 @@ classdef simEngine3D < handle
               P = this.computeP();
               F = this.computeF();
               tau_caret = this.compute_tau_caret();
-              Phi_r = this.Phi_q(:,1:3*(this.nb-1));
-              Phi_p = this.Phi_q(:,3*(this.nb-1)+1:end);
+              Phi_r = this.Phi_q(1:this.nc,1:3*(this.nb-1));
+              Phi_p = this.Phi_q(1:this.nc,3*(this.nb-1)+1:end);
               
               % Build the matrix for inverse dynamics
               % Left
@@ -307,13 +307,17 @@ classdef simEngine3D < handle
           %%% Second, need to compute initial acceleration %%%
           this.compute_acceleration();
           
+          this.compute_cons();
           results{k}.time = this.t;
-          results{k}.q = [this.q_i;this.q_j];
-          results{k}.dq = [this.dq_i;this.dq_j];
-          results{k}.ddq = [this.ddq_i;this.ddq_j];
+          results{k}.r = [this.r_i;this.r_j];
+          results{k}.dr = [this.dr_i;this.dr_j];
+          results{k}.ddr = [this.ddr_i;this.ddr_j];
+          results{k}.p = [this.p_i;this.p_j];
+          results{k}.dp = [this.dp_i;this.dp_j];
+          results{k}.ddp = [this.ddp_i;this.ddp_j];
           results{k}.torques = cell(this.nc,this.nb-1);
-          Phi_r = this.Phi_q(:,1:3*(this.nb-1));
-          Phi_p = this.Phi_q(:,3*(this.nb-1)+1:end);
+          Phi_r = this.Phi_q(1:this.nc,1:3*(this.nb-1));
+          Phi_p = this.Phi_q(1:this.nc,3*(this.nb-1)+1:end);
           for h = 1:this.nb-1
               Phi_p_h = Phi_p(:,(4*h-3):4*h);
               G = p2G(this.p_i); % need to update when there are more bodies
@@ -328,15 +332,19 @@ classdef simEngine3D < handle
           k = 2;
           time = t_start + (k-1)*t_step;
           this.t = time; % update system time to t_0
-          this.BDF_solve_dynamic(1,t_step,results); % BDF method of order 1
+          this.BDF_solve_dynamic(1,t_step,results,k); % BDF method of order 1
           
+          this.compute_cons();
           results{k}.time = this.t;
-          results{k}.q = [this.q_i;this.q_j];
-          results{k}.dq = [this.dq_i;this.dq_j];
-          results{k}.ddq = [this.ddq_i;this.ddq_j];
+          results{k}.r = [this.r_i;this.r_j];
+          results{k}.dr = [this.dr_i;this.dr_j];
+          results{k}.ddr = [this.ddr_i;this.ddr_j];
+          results{k}.p = [this.p_i;this.p_j];
+          results{k}.dp = [this.dp_i;this.dp_j];
+          results{k}.ddp = [this.ddp_i;this.ddp_j];
           results{k}.torques = cell(this.nc,this.nb-1);
-          Phi_r = this.Phi_q(:,1:3*(this.nb-1));
-          Phi_p = this.Phi_q(:,3*(this.nb-1)+1:end);
+          Phi_r = this.Phi_q(1:this.nc,1:3*(this.nb-1));
+          Phi_p = this.Phi_q(1:this.nc,3*(this.nb-1)+1:end);
           for h = 1:this.nb-1
               Phi_p_h = Phi_p(:,(4*h-3):4*h);
               G = p2G(this.p_i); % need to update when there are more bodies
@@ -349,15 +357,19 @@ classdef simEngine3D < handle
           for k=3:counts
               time = t_start + (k-1)*t_step;
               this.t = time; % update system time to t_0
-              this.BDF_solve_dynamic(BDF_order,t_step,results); % BDF method of order 2
+              this.BDF_solve_dynamic(BDF_order,t_step,results,k); % BDF method of order 2
               
+              this.compute_cons();
               results{k}.time = this.t;
-              results{k}.q = [this.q_i;this.q_j];
-              results{k}.dq = [this.dq_i;this.dq_j];
-              results{k}.ddq = [this.ddq_i;this.ddq_j];
+              results{k}.r = [this.r_i;this.r_j];
+              results{k}.dr = [this.dr_i;this.dr_j];
+              results{k}.ddr = [this.ddr_i;this.ddr_j];
+              results{k}.p = [this.p_i;this.p_j];
+              results{k}.dp = [this.dp_i;this.dp_j];
+              results{k}.ddp = [this.ddp_i;this.ddp_j];
               results{k}.torques = cell(this.nc,this.nb-1);
-              Phi_r = this.Phi_q(:,1:3*(this.nb-1));
-              Phi_p = this.Phi_q(:,3*(this.nb-1)+1:end);
+              Phi_r = this.Phi_q(1:this.nc,1:3*(this.nb-1));
+              Phi_p = this.Phi_q(1:this.nc,3*(this.nb-1)+1:end);
               for h = 1:this.nb-1
                   Phi_p_h = Phi_p(:,(4*h-3):4*h);
                   G = p2G(this.p_i); % need to update when there are more bodies
@@ -378,8 +390,8 @@ classdef simEngine3D < handle
           eps = 1e-3;
           
           this.compute_cons();
-          Phi_r = this.Phi_q(:,1:3*(this.nb-1));
-          Phi_p = this.Phi_q(:,3*(this.nb-1)+1:end);
+          Phi_r = this.Phi_q(1:this.nc,1:3*(this.nb-1));
+          Phi_p = this.Phi_q(1:this.nc,3*(this.nb-1)+1:end);
           P = this.computeP();
           
           if max(abs(this.Phi))>eps
@@ -392,7 +404,7 @@ classdef simEngine3D < handle
               end
           end
           
-          if max(abs(Phi_r*this.dr_i+Phi_p*this.dp_i - this.nu))>eps % need to update when there are more bodies
+          if max(abs(Phi_r*this.dr_i+Phi_p*this.dp_i - this.nu(1:this.nc)))>eps % need to update when there are more bodies
               error("level 1 constraint is not satisfied");
           end
           
@@ -412,8 +424,8 @@ classdef simEngine3D < handle
           P = this.computeP();
           F = this.computeF();
           tau_caret = this.compute_tau_caret();
-          Phi_r = this.Phi_q(:,1:3*(this.nb-1));
-          Phi_p = this.Phi_q(:,3*(this.nb-1)+1:end);
+          Phi_r = this.Phi_q(1:this.nc,1:3*(this.nb-1));
+          Phi_p = this.Phi_q(1:this.nc,3*(this.nb-1)+1:end);
           gamma_p = this.gamma(this.nc+1:end);
           gamma_caret = this.gamma(1:this.nc);
           % Left matrix
@@ -435,7 +447,7 @@ classdef simEngine3D < handle
           this.lambda = unknown(8*(this.nb-1)+1:end);
       end
       
-      function BDF_solve_dynamic(this,BDF_order,step_size,recent_solution)
+      function BDF_solve_dynamic(this,BDF_order,step_size,recent_solution,n)
           % This function use BDF method to solve dynamic problem
           
           eps = 1e-2; % tolerance
@@ -444,24 +456,24 @@ classdef simEngine3D < handle
                     
           switch BDF_order
               case 1
-                  s1 = recent_solution{end}; % most recent solution
+                  s1 = recent_solution{n-1}; % most recent solution
                   beta = 1;
                   a1 = -1;
-                  C_r_dot = -a1*s1.dr_i;
+                  C_r_dot = -a1*s1.dr;
                   C_r = -a1*s1.r_i + beta*h*C_r_dot;
-                  C_p_dot = -a1*s1.dp_i;
+                  C_p_dot = -a1*s1.dp;
                   C_p = -a1*s1.p_i + beta*h*C_p_dot;
                   
               case 2
-                  s1 = recent_solution{end}; % most recent solution
-                  s2 = recent_solution{end-1};
+                  s1 = recent_solution{n-1}; % most recent solution
+                  s2 = recent_solution{n-2};
                   beta = 2/3;
                   a1 = -4/3;
                   a2 = 1/3;
-                  C_r_dot = -a1*state1.rdot -a2*state2.rdot;
-                  C_r = -a1*state1.r -a2*state2.r + beta*h*C_r_dot;
-                  C_p_dot = -a1*state1.pdot -a2*state2.pdot;
-                  C_p = -a1*state1.p -a2*state2.p + beta*h*C_p_dot;
+                  C_r_dot = -a1*s1.dr -a2*s2.dr;
+                  C_r = -a1*s1.r -a2*s2.r + beta*h*C_r_dot;
+                  C_p_dot = -a1*s1.dp -a2*s2.dp;
+                  C_p = -a1*s1.p -a2*s2.p + beta*h*C_p_dot;
                   
               otherwise
                   error("only support BDF method of order 1 or 2");
@@ -470,20 +482,72 @@ classdef simEngine3D < handle
           %%% Stage 0: prime new time step %%%
           
           this.ddr_i   = s1.ddr_i;
-          ddp_i   = s1.ddp_i;
-          lambda_p = s1.lambda_p;
-          lambda  = s1.lambda;
+          this.ddp_i   = s1.ddp_i;
+          this.lambda_p = s1.lambda_p;
+          this.lambda  = s1.lambda;
           
           for k = 1:itCountMax
               
               %%% Stage 1: compute position and velocity using BDF and most recent accelerations %%%
               
-              r     = Cr + beta0^2*h^2*rddot;
-              p     = Cp + beta0^2*h^2*pddot;
-              rdot  = Crdot + beta0*h*rddot;
-              pdot  = Cpdot + beta0*h*pddot;
+              this.r_i = C_r + beta^2*h^2*this.ddr_i;
+              this.dr_i = C_r_dot + beta*h*this.ddr_i;
+              this.p_i = C_p + beta^2*h^2*this.ddp_i;
+              this.dp_i = C_p_dot + beta*h*this.ddp_i;
+              
+              %%% Stage 2: compute the residual %%%
+              
+              this.compute_cons();
+              M = this.computeM();
+              J_p = this.computeJ_p();
+              P = this.computeP();
+              F = this.computeF();
+              tau_caret = this.compute_tau_caret();
+              Phi_r = this.Phi_q(1:this.nc,1:3*(this.nb-1));
+              Phi_p = this.Phi_q(1:this.nc,3*(this.nb-1)+1:end);
+              
+              g = [M*this.ddr_i + Phi_r'*this.lambda - F;
+                  J_p*this.ddp_i + Phi_p'*this.lambda + P'*this.lambda_p - tau_caret;
+                  this.Phi(this.nc+1:end)/(beta^2*h^2);
+                  this.Phi(1:this.nc)/(beta^2*h^2)];
+              
+              %%% Stage 3: solve linear system to get correction %%%
+              
+              % use Quasi Newton
+              if k == 1
+                  Psi = [M  zeros(3*(this.nb-1),4*(this.nb-1))  zeros(3*(this.nb-1),(this.nb-1))  Phi_r';
+                        zeros(4*(this.nb-1),3*(this.nb-1))  J_p  P'  Phi_p';
+                        zeros((this.nb-1),3*(this.nb-1))  P  zeros(this.nb-1)  zeros((this.nb-1),this.nc);
+                        Phi_r  Phi_p  zeros(this.nc,(this.nb-1))  zeros(this.nc) ]; % approximate the Jacobian
+              end
+              
+              delta = -Psi\g;
+              
+              %%% Stage 4: improve the quality of approximate solution %%%
+              
+              this.ddr_i   = this.ddr_i + delta(1:3*(this.nb-1));
+              this.ddp_i   = this.ddp_i + delta(3*(this.nb-1)+1:7*(this.nb-1));
+              this.lambda_p = this.lambda_p + delta(7*(this.nb-1)+1:8*(this.nb-1));
+              this.lambda  = this.lambda + delta(8*(this.nb-1)+1:end);
+              
+              %%% Stage 5: Go to Stage 6 if norm(delta) is small otherwise go back to stage 1 %%%
+              
+              if norm(delta) < eps
+                  break;
+              end
               
           end
+          
+          if k >= itCountMax
+              error("Maximum number of iterations reached");
+          end
+          
+          %%% Stage 6: get level 0 and level 1 variables %%%
+          
+          this.r_i     = C_r + beta^2*h^2*this.ddr_i;
+          this.p_i     = C_p + beta^2*h^2*this.ddp_i;
+          this.dr_i  = C_r_dot + beta*h*this.ddr_i;
+          this.dp_i  = C_p_dot + beta*h*this.ddp_i;
           
       end
       
