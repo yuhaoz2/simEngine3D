@@ -1,16 +1,16 @@
-% This is the main script to be excuted for the first mechanism model
-% (Pendulum with revolute joint) of Assignment 8 Problem 1
+% This is the main script to be excuted for the double Pendulum model
+% of Assignment 8 Problem 2
 
 clear
 
 % build the model
-sys = simEngine3D("revJoint"); % revJoint.m is the model info file
+sys = simEngine3D("double_pen"); % double_pen.m is the model info file
 
 % Assign start time, ending time and time step
 t_start = 0;
 t_end = 10;
 t_step = 1e-3;
-BDF_order = 2;
+BDF_order = 1;
 
 % Perform the dynamic analysis
 start = tic;
@@ -21,22 +21,8 @@ disp(['The simulation time is ' num2str(run_time) ' seconds, and step size is ' 
 
 t = t_start:t_step:t_end;
 
-% Plot the torque
 
-torque =zeros(3,length(t));
-
-for i = 1: length(t)
-    for j = 1:5
-        torque(:,i) = torque(:,i) + results{i}.torques{j};
-    end
-end
-
-figure
-plot(t,torque);
-title('Plot of torque as a function of time');
-xlabel('Time (sec)');
-ylabel('Torque (Nm)');
-legend('T_z','T_y','T_x');
+%% Plots
 
 % Plot coordiantes of point O'
 
@@ -94,18 +80,18 @@ end
 figure 
 subplot(3,1,1)
 plot(t,omega(1,:));
-title('Plot of angular velocity ');
+title('Plot of angular velocity in G-RF x axis');
 xlabel('Time (sec)');
-ylabel('x coordinate (m)');
+ylabel('omega_x (rad/s)');
 
 subplot(3,1,2)
 plot(t,omega(2,:));
-title('y coordinate function plot of point O`');
+title('Plot of angular velocity in G-RF y axis');
 xlabel('Time (sec)');
-ylabel('y coordinate (m)');
+ylabel('omega_y (rad/s)');
 
 subplot(3,1,3)
 plot(t,omega(3,:));
-title('z coordinate function plot of point O`');
+title('Plot of angular velocity in G-RF z axis');
 xlabel('Time (sec)');
-ylabel('z coordinate (m)');
+ylabel('omega_z (rad/s)');

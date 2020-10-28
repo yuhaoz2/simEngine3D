@@ -21,6 +21,8 @@ disp(['The simulation time is ' num2str(run_time) ' seconds, and step size is ' 
 
 t = t_start:t_step:t_end;
 
+%% Plots
+
 % Plot the torque
 
 torque =zeros(3,length(t));

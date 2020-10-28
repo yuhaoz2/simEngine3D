@@ -1,123 +1,382 @@
 classdef simEngine3D < handle
 % A collection of all the functions  for kinematics and dynamics analysis
-% on 3D model. For now it only deal with 2-body system.
+% on 3D model.
 
 % Author: Yuhao Zhang
 % Date: Oct, 2020
     
     properties
-        nb; % number of bodies, 2 for now
+        nb; % number of bodies
         body; % collection of body info
-        i; % Body 1 index, typically is 1
-        j; % Body 2 index, typically is 0 or 2
-        q_i; % generalized coordinates of body i, q = [r;p]
-        dq_i; % derivative of generalized coordinates of body i, dq = [dr;dp]
-        ddq_i; % second derivative of generalized coordinates of body i, ddq = [ddr;ddp]
-        q_j; % generalized coordinates of body j, q = [r;p]
-        dq_j; % derivative of generalized coordinates of body j, dq = [dr;dp]
-        ddq_j; % second derivative of generalized coordinates of body j, ddq = [ddr;ddp]
-        r_i;
-        dr_i;
-        ddr_i;
-        p_i;
-        dp_i;
-        ddp_i;
-        r_j;
-        dr_j;
-        ddr_j;
-        p_j;
-        dp_j;
-        ddp_j;
-        nc; % number of constraints (not including Euler parameter normalization constraint)
+        r; % position vector
+        dr; % derivative of r
+        ddr; % second order derivative of r
+        p; % euler parameter vector
+        dp; % derivative of p
+        ddp; % second order derivative of p
+        q; % generalized coordinates
+        dq; % derivative of q
+        ddq; % second order derivative of q
+        nc; % number of kinematic constraints (not including Euler parameter normalization constraint)
         constraints; % collection of kinematic constraints
         t; % current time in system
-        Phi;
-        Phi_q;
-        nu;
-        gamma;
-        lambda_p;
-        lambda;
+%         PhiF; % overall constarints set
+%         PhiF_q; % jacobian matrix of PhiF
+%         PhiK; % kinematic constraints set
+%         PhiK_r; % jacobian matrix of PhiK
+%         PhiK_p; % jacobian matrix of PhiK
+%         PhiP; % Euler parameter normalization constraints
+%         nuF; % right hand side of velocity eqaution for overall constarints
+%         nuK; % right hand side of velocity eqaution for kinematic constarints
+%         nuP; % right hand side of velocity eqaution for Euler parameter normalization constarints
+%         gammaF; % right hand side of acceleration eqaution for overall constarints
+%         gammaK; % right hand side of acceleration eqaution for kinematic constarints
+%         gammaP; % right hand side of acceleration eqaution for Euler parameter normalization constarints
+        lambda_p; % lagrange multipliers from Euler parameter normalization constarints
+        lambda; % lagrange multipliers from kinematic constarints
     end
     
     methods (Access = public)
+        
       function this = simEngine3D(model_name) % build the model
           run(model_name); % this step run the driver script
           this.nb =nb;
           this.body = body;
-          this.i=body(1).id;
-          this.j=body(2).id;
           
-          this.q_i=body(1).q_0;
-          this.dq_i=body(1).dq_0;
-          this.ddq_i=zeros(7,1);
+          this.r = zeros(3*this.nb,1);
+          this.dr = zeros(3*this.nb,1);
+          this.ddr = zeros(3*this.nb,1);
+          this.p = zeros(4*this.nb,1);
+          this.dp = zeros(4*this.nb,1);
+          this.ddp = zeros(4*this.nb,1);
+          this.q = zeros(7*this.nb,1);
+          this.dq = zeros(7*this.nb,1);
+          this.ddq = zeros(7*this.nb,1);
           
-          this.r_i=this.q_i(1:3);
-          this.dr_i=this.dq_i(1:3);
-          this.ddr_i=this.ddq_i(1:3);
-          this.p_i=this.q_i(4:7);
-          this.dp_i=this.dq_i(4:7);
-          this.ddp_i=this.ddq_i(4:7);
-          
-          this.q_j=body(2).q_0;
-          this.dq_j=body(2).dq_0;
-          this.ddq_j=zeros(7,1);
-          
-          this.r_j=this.q_j(1:3);
-          this.dr_j=this.dq_j(1:3);
-          this.ddr_j=this.ddq_j(1:3);
-          this.p_j=this.q_j(4:7);
-          this.dp_j=this.dq_j(4:7);
-          this.ddp_j=this.ddq_j(4:7);
+          for i = 1:this.nb
+              this.r((i-1)*3+1:3*i) = this.body(i).r_0;
+              this.dr((i-1)*3+1:3*i) = this.body(i).dr_0;
+              this.ddr((i-1)*3+1:3*i) = this.body(i).ddr_0;
+              this.p((i-1)*4+1:4*i) = this.body(i).p_0;
+              this.dp((i-1)*4+1:4*i) = this.body(i).dp_0;
+              this.ddp((i-1)*4+1:4*i) = this.body(i).ddp_0;
+              
+              this.q((i-1)*7+1:7*i) = [this.body(i).r_0;this.body(i).p_0];
+              this.dq((i-1)*7+1:7*i) = [this.body(i).dr_0;this.body(i).dp_0];
+              this.ddq((i-1)*7+1:7*i) = [this.body(i).ddr_0;this.body(i).ddp_0];
+          end
           
           this.nc=nc;
           this.constraints = constraints;
-          this.t=0;
-          this.Phi = [];
-          this.Phi_q=[];
-          this.nu=[];
-          this.gamma=[];
+          this.t = 0;
+
       end
       
-      function compute_cons(this) % this function computer kinematic constraint values
-          this.Phi = [];
-          this.Phi_q=[];
-          this.nu=[];
-          this.gamma=[];
-          for k = 1:this.nc
+      
+      
+      
+      
+      function PhiK = get_PhiK(this)
+          % compute kinematic constraints set
+          PhiK = zeros(this.nc,1);
+           for k = 1:this.nc
+               i = this.constraints(k).body_i;
+               j = this.constraints(k).body_j;
               switch  this.constraints(k).type
                   case 'DP1'
-                      [Phi,nu,gamma,Phi_r,Phi_p]=GCon_DP1(this.i,this.q_i,this.dq_i,this.constraints(k).a_i_bar,this.j,this.q_j,this.dq_j,this.constraints(k).a_j_bar,this.constraints(k).f(this.t),this.constraints(k).df(this.t),this.constraints(k).ddf(this.t),0);
+                      if j ~=0
+                          [Phi_GCon,~,~,~,~]=GCon_DP1(i,this.q((i-1)*7+1:7*i),this.dq((i-1)*7+1:7*i),this.constraints(k).a_i_bar,...
+                              j,this.q((j-1)*7+1:7*j),this.dq((j-1)*7+1:7*j),this.constraints(k).a_j_bar,this.constraints(k).f(this.t),this.constraints(k).df(this.t),this.constraints(k).ddf(this.t),1);
+                      else
+                          [Phi_GCon,~,~,~,~]=GCon_DP1(i,this.q((i-1)*7+1:7*i),this.dq((i-1)*7+1:7*i),this.constraints(k).a_i_bar,...
+                              j,[],[],this.constraints(k).a_j_bar,this.constraints(k).f(this.t),this.constraints(k).df(this.t),this.constraints(k).ddf(this.t),1);
+                      end
                   case 'DP2'
-                      [Phi,nu,gamma,Phi_r,Phi_p]=GCon_DP2(this.i,this.q_i,this.dq_i,this.constraints(k).a_i_bar,this.constraints(k).s_i_P_bar,this.j,this.q_j,this.dq_j,this.constraints(k).s_j_Q_bar,this.constraints(k).f(this.t),this.constraints(k).df(this.t),this.constraints(k).ddf(this.t),0);
+                      if j ~=0
+                          [Phi_GCon,~,~,~,~]=GCon_DP2(i,this.q((i-1)*7+1:7*i),this.dq((i-1)*7+1:7*i),this.constraints(k).a_i_bar,this.constraints(k).s_i_P_bar,...
+                              j,this.q((j-1)*7+1:7*j),this.dq((j-1)*7+1:7*j),this.constraints(k).s_j_Q_bar,this.constraints(k).f(this.t),this.constraints(k).df(this.t),this.constraints(k).ddf(this.t),1);
+                      else
+                          [Phi_GCon,~,~,~,~]=GCon_DP2(i,this.q((i-1)*7+1:7*i),this.dq((i-1)*7+1:7*i),this.constraints(k).a_i_bar,this.constraints(k).s_i_P_bar,...
+                              j,[],[],this.constraints(k).s_j_Q_bar,this.constraints(k).f(this.t),this.constraints(k).df(this.t),this.constraints(k).ddf(this.t),1);
+                      end
                   case 'D'
-                      [Phi,nu,gamma,Phi_r,Phi_p]=GCon_D(this.i,this.q_i,this.dq_i,this.constraints(k).s_i_P_bar,this.j,this.q_j,this.dq_j,this.constraints(k).s_j_Q_bar,this.constraints(k).f(this.t),this.constraints(k).df(this.t),this.constraints(k).ddf(this.t),0);
+                      if j ~=0
+                          [Phi_GCon,~,~,~,~]=GCon_D(i,this.q((i-1)*7+1:7*i),this.dq((i-1)*7+1:7*i),this.constraints(k).s_i_P_bar,...
+                              j,this.q((j-1)*7+1:7*j),this.dq((j-1)*7+1:7*j),this.constraints(k).s_j_Q_bar,this.constraints(k).f(this.t),this.constraints(k).df(this.t),this.constraints(k).ddf(this.t),1);
+                      else
+                          [Phi_GCon,~,~,~,~]=GCon_D(i,this.q((i-1)*7+1:7*i),this.dq((i-1)*7+1:7*i),this.constraints(k).s_i_P_bar,...
+                              j,[],[],this.constraints(k).s_j_Q_bar,this.constraints(k).f(this.t),this.constraints(k).df(this.t),this.constraints(k).ddf(this.t),1);
+                      end
                   case 'CD'
-                      [Phi,nu,gamma,Phi_r,Phi_p]=GCon_CD(this.constraints(k).c,this.i,this.q_i,this.dq_i,this.constraints(k).s_i_P_bar,this.j,this.q_j,this.dq_j,this.constraints(k).s_j_Q_bar,this.constraints(k).f(this.t),this.constraints(k).df(this.t),this.constraints(k).ddf(this.t),0);
+                      if j ~=0
+                          [Phi_GCon,~,~,~,~]=GCon_CD(this.constraints(k).c,i,this.q((i-1)*7+1:7*i),this.dq((i-1)*7+1:7*i),this.constraints(k).s_i_P_bar,...
+                              j,this.q((j-1)*7+1:7*j),this.dq((j-1)*7+1:7*j),this.constraints(k).s_j_Q_bar,this.constraints(k).f(this.t),this.constraints(k).df(this.t),this.constraints(k).ddf(this.t),1);
+                      else
+                          [Phi_GCon,~,~,~,~]=GCon_CD(this.constraints(k).c,i,this.q((i-1)*7+1:7*i),this.dq((i-1)*7+1:7*i),this.constraints(k).s_i_P_bar,...
+                              j,[],[],this.constraints(k).s_j_Q_bar,this.constraints(k).f(this.t),this.constraints(k).df(this.t),this.constraints(k).ddf(this.t),1);
+                      end
                   otherwise
                       error('Constraint type incorrect.');
               end
-              this.Phi = [this.Phi;Phi];
-              this.Phi_q = [this.Phi_q;Phi_r, Phi_p];
-              this.nu = [this.nu;nu];
-              this.gamma = [this.gamma;gamma];
+              PhiK(k) = Phi_GCon;
+           end
+      end
+      
+      function PhiP = get_PhiP(this)
+          % compute Euler parameter normalization constraints
+          PhiP = zeros(this.nb,1);
+          for i = 1:this.nb
+              PhiP(i) = this.p((i-1)*4+1:4*i)'*this.p((i-1)*4+1:4*i)/2 -1/2;
           end
-          % add euler parameter normalization constraint
-          Phi_euler = this.p_i'*this.p_i/2 -1/2;
-          Phi_q_euler = [zeros(1,3) this.p_i'];
-          nu_euler = 0;
-          gamma_euler =  -this.dp_i'*this.dp_i;
-          this.Phi = [this.Phi;Phi_euler];
-          this.Phi_q = [this.Phi_q;Phi_q_euler];
-          this.nu = [this.nu;nu_euler];
-          this.gamma = [this.gamma;gamma_euler];
+      end
+      
+      function PhiF = get_PhiF(this)
+          % compute overall constarints set
+          PhiK = this.get_PhiK();
+          PhiP = this.get_PhiP();
+          PhiF = [PhiK; PhiP];
+      end
+      
+      function nuK = get_nuK(this)
+          % compute right hand side of velocity eqaution for kinematic constarints
+           nuK = zeros(this.nc,1);
+           for k = 1:this.nc
+               i = this.constraints(k).body_i;
+               j = this.constraints(k).body_j;
+               if j ~=0
+                   switch  this.constraints(k).type
+                       case 'DP1'
+                           [~,nu_GCon,~,~,~]=GCon_DP1(i,this.q((i-1)*7+1:7*i),this.dq((i-1)*7+1:7*i),this.constraints(k).a_i_bar,...
+                               j,this.q((j-1)*7+1:7*j),this.dq((j-1)*7+1:7*j),this.constraints(k).a_j_bar,this.constraints(k).f(this.t),this.constraints(k).df(this.t),this.constraints(k).ddf(this.t),2);
+                       case 'DP2'
+                           [~,nu_GCon,~,~,~]=GCon_DP2(i,this.q((i-1)*7+1:7*i),this.dq((i-1)*7+1:7*i),this.constraints(k).a_i_bar,this.constraints(k).s_i_P_bar,...
+                               j,this.q((j-1)*7+1:7*j),this.dq((j-1)*7+1:7*j),this.constraints(k).s_j_Q_bar,this.constraints(k).f(this.t),this.constraints(k).df(this.t),this.constraints(k).ddf(this.t),2);
+                       case 'D'
+                           [~,nu_GCon,~,~,~]=GCon_D(i,this.q((i-1)*7+1:7*i),this.dq((i-1)*7+1:7*i),this.constraints(k).s_i_P_bar,...
+                               j,this.q((j-1)*7+1:7*j),this.dq((j-1)*7+1:7*j),this.constraints(k).s_j_Q_bar,this.constraints(k).f(this.t),this.constraints(k).df(this.t),this.constraints(k).ddf(this.t),2);
+                       case 'CD'
+                           [~,nu_GCon,~,~,~]=GCon_CD(this.constraints(k).c,i,this.q((i-1)*7+1:7*i),this.dq((i-1)*7+1:7*i),this.constraints(k).s_i_P_bar,...
+                               j,this.q((j-1)*7+1:7*j),this.dq((j-1)*7+1:7*j),this.constraints(k).s_j_Q_bar,this.constraints(k).f(this.t),this.constraints(k).df(this.t),this.constraints(k).ddf(this.t),2);
+                       otherwise
+                           error('Constraint type incorrect.');
+                   end
+               else
+                   switch  this.constraints(k).type
+                       case 'DP1'
+                           [~,nu_GCon,~,~,~]=GCon_DP1(i,this.q((i-1)*7+1:7*i),this.dq((i-1)*7+1:7*i),this.constraints(k).a_i_bar,...
+                               j,[],[],this.constraints(k).a_j_bar,this.constraints(k).f(this.t),this.constraints(k).df(this.t),this.constraints(k).ddf(this.t),2);
+                       case 'DP2'
+                           [~,nu_GCon,~,~,~]=GCon_DP2(i,this.q((i-1)*7+1:7*i),this.dq((i-1)*7+1:7*i),this.constraints(k).a_i_bar,this.constraints(k).s_i_P_bar,...
+                               j,[],[],this.constraints(k).s_j_Q_bar,this.constraints(k).f(this.t),this.constraints(k).df(this.t),this.constraints(k).ddf(this.t),2);
+                       case 'D'
+                           [~,nu_GCon,~,~,~]=GCon_D(i,this.q((i-1)*7+1:7*i),this.dq((i-1)*7+1:7*i),this.constraints(k).s_i_P_bar,...
+                               j,[],[],this.constraints(k).s_j_Q_bar,this.constraints(k).f(this.t),this.constraints(k).df(this.t),this.constraints(k).ddf(this.t),2);
+                       case 'CD'
+                           [~,nu_GCon,~,~,~]=GCon_CD(this.constraints(k).c,i,this.q((i-1)*7+1:7*i),this.dq((i-1)*7+1:7*i),this.constraints(k).s_i_P_bar,...
+                               j,[],[],this.constraints(k).s_j_Q_bar,this.constraints(k).f(this.t),this.constraints(k).df(this.t),this.constraints(k).ddf(this.t),2);
+                       otherwise
+                           error('Constraint type incorrect.');
+                   end
+               end
+               nuK(k) = nu_GCon;
+           end
+      end
+      
+      function nuP = get_nuP(this)
+          % compute right hand side of velocity eqaution for Euler parameter normalization constarints
+          nuP = zeros(this.nb,1);
+      end
+      
+      function nuF = get_nuF(this)
+          % compute right hand side of velocity eqaution for overall constarints
+          nuK = this.get_nuK();
+          nuP = this.get_nuP();
+          nuF = [nuK; nuP];
+      end
+      
+      function gammaK = get_gammaK(this)
+          % compute right hand side of acceleration eqaution for kinematic constarints
+           gammaK = zeros(this.nc,1);
+           for k = 1:this.nc
+               i = this.constraints(k).body_i;
+               j = this.constraints(k).body_j;
+               if j ~=0
+                   switch  this.constraints(k).type
+                       case 'DP1'
+                           [~,~,gamma_GCon,~,~]=GCon_DP1(i,this.q((i-1)*7+1:7*i),this.dq((i-1)*7+1:7*i),this.constraints(k).a_i_bar,...
+                               j,this.q((j-1)*7+1:7*j),this.dq((j-1)*7+1:7*j),this.constraints(k).a_j_bar,this.constraints(k).f(this.t),this.constraints(k).df(this.t),this.constraints(k).ddf(this.t),3);
+                       case 'DP2'
+                           [~,~,gamma_GCon,~,~]=GCon_DP2(i,this.q((i-1)*7+1:7*i),this.dq((i-1)*7+1:7*i),this.constraints(k).a_i_bar,this.constraints(k).s_i_P_bar,...
+                               j,this.q((j-1)*7+1:7*j),this.dq((j-1)*7+1:7*j),this.constraints(k).s_j_Q_bar,this.constraints(k).f(this.t),this.constraints(k).df(this.t),this.constraints(k).ddf(this.t),3);
+                       case 'D'
+                           [~,~,gamma_GCon,~,~]=GCon_D(i,this.q((i-1)*7+1:7*i),this.dq((i-1)*7+1:7*i),this.constraints(k).s_i_P_bar,...
+                               j,this.q((j-1)*7+1:7*j),this.dq((j-1)*7+1:7*j),this.constraints(k).s_j_Q_bar,this.constraints(k).f(this.t),this.constraints(k).df(this.t),this.constraints(k).ddf(this.t),3);
+                       case 'CD'
+                           [~,~,gamma_GCon,~,~]=GCon_CD(this.constraints(k).c,i,this.q((i-1)*7+1:7*i),this.dq((i-1)*7+1:7*i),this.constraints(k).s_i_P_bar,...
+                               j,this.q((j-1)*7+1:7*j),this.dq((j-1)*7+1:7*j),this.constraints(k).s_j_Q_bar,this.constraints(k).f(this.t),this.constraints(k).df(this.t),this.constraints(k).ddf(this.t),3);
+                       otherwise
+                           error('Constraint type incorrect.');
+                   end
+               else
+                   switch  this.constraints(k).type
+                       case 'DP1'
+                           [~,~,gamma_GCon,~,~]=GCon_DP1(i,this.q((i-1)*7+1:7*i),this.dq((i-1)*7+1:7*i),this.constraints(k).a_i_bar,...
+                               j,[],[],this.constraints(k).a_j_bar,this.constraints(k).f(this.t),this.constraints(k).df(this.t),this.constraints(k).ddf(this.t),3);
+                       case 'DP2'
+                           [~,~,gamma_GCon,~,~]=GCon_DP2(i,this.q((i-1)*7+1:7*i),this.dq((i-1)*7+1:7*i),this.constraints(k).a_i_bar,this.constraints(k).s_i_P_bar,...
+                               j,[],[],this.constraints(k).s_j_Q_bar,this.constraints(k).f(this.t),this.constraints(k).df(this.t),this.constraints(k).ddf(this.t),3);
+                       case 'D'
+                           [~,~,gamma_GCon,~,~]=GCon_D(i,this.q((i-1)*7+1:7*i),this.dq((i-1)*7+1:7*i),this.constraints(k).s_i_P_bar,...
+                               j,[],[],this.constraints(k).s_j_Q_bar,this.constraints(k).f(this.t),this.constraints(k).df(this.t),this.constraints(k).ddf(this.t),3);
+                       case 'CD'
+                           [~,~,gamma_GCon,~,~]=GCon_CD(this.constraints(k).c,i,this.q((i-1)*7+1:7*i),this.dq((i-1)*7+1:7*i),this.constraints(k).s_i_P_bar,...
+                               j,[],[],this.constraints(k).s_j_Q_bar,this.constraints(k).f(this.t),this.constraints(k).df(this.t),this.constraints(k).ddf(this.t),3);
+                       otherwise
+                           error('Constraint type incorrect.');
+                   end
+               end
+               gammaK(k) = gamma_GCon;
+           end
+      end
+      
+      function gammaP = get_gammaP(this)
+          % compute right hand side of acceleration eqaution for Euler parameter normalization constarints
+          gammaP = zeros(this.nb,1);
+          for i = 1:this.nb
+              gammaP(i) = -this.dp((i-1)*4+1:4*i)'*this.dp((i-1)*4+1:4*i);
+          end
+      end
+      
+      function gammaF = get_gammaF(this)
+          % compute right hand side of acceleration eqaution for overall constarints
+          gammaK = this.get_gammaK();
+          gammaP = this.get_gammaP();
+          gammaF = [gammaK; gammaP];
+      end
+      
+      function PhiK_r = get_PhiK_r(this)
+          % compute jacobian matrix of PhiK
+          PhiK_r = zeros(this.nc,3*this.nb);
+          
+          for k = 1:this.nc
+               i = this.constraints(k).body_i;
+               j = this.constraints(k).body_j;
+               if j ~=0
+                   switch  this.constraints(k).type
+                       case 'DP1'
+                           [~,~,~,Phi_r_GCon,~]=GCon_DP1(i,this.q((i-1)*7+1:7*i),this.dq((i-1)*7+1:7*i),this.constraints(k).a_i_bar,...
+                               j,this.q((j-1)*7+1:7*j),this.dq((j-1)*7+1:7*j),this.constraints(k).a_j_bar,this.constraints(k).f(this.t),this.constraints(k).df(this.t),this.constraints(k).ddf(this.t),4);
+                       case 'DP2'
+                           [~,~,~,Phi_r_GCon,~]=GCon_DP2(i,this.q((i-1)*7+1:7*i),this.dq((i-1)*7+1:7*i),this.constraints(k).a_i_bar,this.constraints(k).s_i_P_bar,...
+                               j,this.q((j-1)*7+1:7*j),this.dq((j-1)*7+1:7*j),this.constraints(k).s_j_Q_bar,this.constraints(k).f(this.t),this.constraints(k).df(this.t),this.constraints(k).ddf(this.t),4);
+                       case 'D'
+                           [~,~,~,Phi_r_GCon,~]=GCon_D(i,this.q((i-1)*7+1:7*i),this.dq((i-1)*7+1:7*i),this.constraints(k).s_i_P_bar,...
+                               j,this.q((j-1)*7+1:7*j),this.dq((j-1)*7+1:7*j),this.constraints(k).s_j_Q_bar,this.constraints(k).f(this.t),this.constraints(k).df(this.t),this.constraints(k).ddf(this.t),4);
+                       case 'CD'
+                           [~,~,~,Phi_r_GCon,~]=GCon_CD(this.constraints(k).c,i,this.q((i-1)*7+1:7*i),this.dq((i-1)*7+1:7*i),this.constraints(k).s_i_P_bar,...
+                               j,this.q((j-1)*7+1:7*j),this.dq((j-1)*7+1:7*j),this.constraints(k).s_j_Q_bar,this.constraints(k).f(this.t),this.constraints(k).df(this.t),this.constraints(k).ddf(this.t),4);
+                       otherwise
+                           error('Constraint type incorrect.');
+                   end
+                   PhiK_r(k,3*(i-1)+1:3*i) = Phi_r_GCon(1:3);
+                   PhiK_r(k,3*(j-1)+1:3*j) = Phi_r_GCon(4:6);
+               else
+                   switch  this.constraints(k).type
+                       case 'DP1'
+                           [~,~,~,Phi_r_GCon,~]=GCon_DP1(i,this.q((i-1)*7+1:7*i),this.dq((i-1)*7+1:7*i),this.constraints(k).a_i_bar,...
+                               j,[],[],this.constraints(k).a_j_bar,this.constraints(k).f(this.t),this.constraints(k).df(this.t),this.constraints(k).ddf(this.t),4);
+                       case 'DP2'
+                           [~,~,~,Phi_r_GCon,~]=GCon_DP2(i,this.q((i-1)*7+1:7*i),this.dq((i-1)*7+1:7*i),this.constraints(k).a_i_bar,this.constraints(k).s_i_P_bar,...
+                               j,[],[],this.constraints(k).s_j_Q_bar,this.constraints(k).f(this.t),this.constraints(k).df(this.t),this.constraints(k).ddf(this.t),4);
+                       case 'D'
+                           [~,~,~,Phi_r_GCon,~]=GCon_D(i,this.q((i-1)*7+1:7*i),this.dq((i-1)*7+1:7*i),this.constraints(k).s_i_P_bar,...
+                               j,[],[],this.constraints(k).s_j_Q_bar,this.constraints(k).f(this.t),this.constraints(k).df(this.t),this.constraints(k).ddf(this.t),4);
+                       case 'CD'
+                           [~,~,~,Phi_r_GCon,~]=GCon_CD(this.constraints(k).c,i,this.q((i-1)*7+1:7*i),this.dq((i-1)*7+1:7*i),this.constraints(k).s_i_P_bar,...
+                               j,[],[],this.constraints(k).s_j_Q_bar,this.constraints(k).f(this.t),this.constraints(k).df(this.t),this.constraints(k).ddf(this.t),4);
+                       otherwise
+                           error('Constraint type incorrect.');
+                   end
+                   PhiK_r(k,3*(i-1)+1:3*i) = Phi_r_GCon(1:3);
+               end
+
+           end
+      end
+      
+      function PhiK_p = get_PhiK_p(this)
+          % compute jacobian matrix of PhiK
+          PhiK_p = zeros(this.nc,4*this.nb);
+          
+          for k = 1:this.nc
+               i = this.constraints(k).body_i;
+               j = this.constraints(k).body_j;
+               if j ~=0
+                   switch  this.constraints(k).type
+                       case 'DP1'
+                           [~,~,~,~,Phi_p_GCon]=GCon_DP1(i,this.q((i-1)*7+1:7*i),this.dq((i-1)*7+1:7*i),this.constraints(k).a_i_bar,...
+                               j,this.q((j-1)*7+1:7*j),this.dq((j-1)*7+1:7*j),this.constraints(k).a_j_bar,this.constraints(k).f(this.t),this.constraints(k).df(this.t),this.constraints(k).ddf(this.t),4);
+                       case 'DP2'
+                           [~,~,~,~,Phi_p_GCon]=GCon_DP2(i,this.q((i-1)*7+1:7*i),this.dq((i-1)*7+1:7*i),this.constraints(k).a_i_bar,this.constraints(k).s_i_P_bar,...
+                               j,this.q((j-1)*7+1:7*j),this.dq((j-1)*7+1:7*j),this.constraints(k).s_j_Q_bar,this.constraints(k).f(this.t),this.constraints(k).df(this.t),this.constraints(k).ddf(this.t),4);
+                       case 'D'
+                           [~,~,~,~,Phi_p_GCon]=GCon_D(i,this.q((i-1)*7+1:7*i),this.dq((i-1)*7+1:7*i),this.constraints(k).s_i_P_bar,...
+                               j,this.q((j-1)*7+1:7*j),this.dq((j-1)*7+1:7*j),this.constraints(k).s_j_Q_bar,this.constraints(k).f(this.t),this.constraints(k).df(this.t),this.constraints(k).ddf(this.t),4);
+                       case 'CD'
+                           [~,~,~,~,Phi_p_GCon]=GCon_CD(this.constraints(k).c,i,this.q((i-1)*7+1:7*i),this.dq((i-1)*7+1:7*i),this.constraints(k).s_i_P_bar,...
+                               j,this.q((j-1)*7+1:7*j),this.dq((j-1)*7+1:7*j),this.constraints(k).s_j_Q_bar,this.constraints(k).f(this.t),this.constraints(k).df(this.t),this.constraints(k).ddf(this.t),4);
+                       otherwise
+                           error('Constraint type incorrect.');
+                   end
+                   PhiK_p(k,4*(i-1)+1:4*i) = Phi_p_GCon(1:4);
+                   PhiK_p(k,4*(j-1)+1:4*j) = Phi_p_GCon(5:8);
+               else
+                   switch  this.constraints(k).type
+                       case 'DP1'
+                           [~,~,~,~,Phi_p_GCon]=GCon_DP1(i,this.q((i-1)*7+1:7*i),this.dq((i-1)*7+1:7*i),this.constraints(k).a_i_bar,...
+                               j,[],[],this.constraints(k).a_j_bar,this.constraints(k).f(this.t),this.constraints(k).df(this.t),this.constraints(k).ddf(this.t),4);
+                       case 'DP2'
+                           [~,~,~,~,Phi_p_GCon]=GCon_DP2(i,this.q((i-1)*7+1:7*i),this.dq((i-1)*7+1:7*i),this.constraints(k).a_i_bar,this.constraints(k).s_i_P_bar,...
+                               j,[],[],this.constraints(k).s_j_Q_bar,this.constraints(k).f(this.t),this.constraints(k).df(this.t),this.constraints(k).ddf(this.t),4);
+                       case 'D'
+                           [~,~,~,~,Phi_p_GCon]=GCon_D(i,this.q((i-1)*7+1:7*i),this.dq((i-1)*7+1:7*i),this.constraints(k).s_i_P_bar,...
+                               j,[],[],this.constraints(k).s_j_Q_bar,this.constraints(k).f(this.t),this.constraints(k).df(this.t),this.constraints(k).ddf(this.t),4);
+                       case 'CD'
+                           [~,~,~,~,Phi_p_GCon]=GCon_CD(this.constraints(k).c,i,this.q((i-1)*7+1:7*i),this.dq((i-1)*7+1:7*i),this.constraints(k).s_i_P_bar,...
+                               j,[],[],this.constraints(k).s_j_Q_bar,this.constraints(k).f(this.t),this.constraints(k).df(this.t),this.constraints(k).ddf(this.t),4);
+                       otherwise
+                           error('Constraint type incorrect.');
+                   end
+                   PhiK_p(k,4*(i-1)+1:4*i) = Phi_p_GCon(1:4);
+               end
+
+           end
+      end
+      
+      function PhiF_q = get_PhiF_q(this)
+          % jacobian matrix of PhiF
+          PhiF_q = zeros(this.nc + this.nb,7*this.nb);
+          PhiK_p = get_PhiK_p();
+          PhiK_r = get_PhiK_r();
+          
+          for i = 1:this.nb
+              PhiF_q(1:this.nc,7*(i-1)+1:7*(i-1)+3) = PhiK_r(:,3*(i-1)+1:3*i);
+              PhiF_q(1:this.nc,7*(i-1)+4:7*i) = PhiK_p(:,4*(i-1)+1:4*i);
+          end
+              
+          for i = 1:this.nb
+              PhiF_q(this.nc+i,7*(i-1)+4:7*i) = this.p((i-1)*4+1:4*i)';
+          end
       end
       
       
-      function states = kinematic_analysis(this,t_start,t_step,t_end)
+      
+      
+      
+      function results = kinematic_analysis(this,t_start,t_step,t_end)
           % perform kinematic analysis
 
           counts = length(t_start:t_step:t_end);
-          states = cell(counts,1);% store states at each step
+          results = cell(counts,1);% store states at each step
           
           for k = 1:counts
               time = t_start + (k-1)*t_step;
@@ -128,10 +387,10 @@ classdef simEngine3D < handle
                   this.velocity_analysis();
                   this.acceleration_analysis();
               end
-              states{k}.time = this.t;
-              states{k}.q = [this.q_i;this.q_j];
-              states{k}.dq = [this.dq_i;this.dq_j];
-              states{k}.ddq = [this.ddq_i;this.ddq_j];
+              results{k}.time = this.t;
+              results{k}.q = this.q;
+              results{k}.dq = this.dq;
+              results{k}.ddq = this.ddq;
           end
       end
       
@@ -142,96 +401,59 @@ classdef simEngine3D < handle
           eps = 1e-6; % tolerance
           itCountMax =20; % max iteration
           
-          if this.j~=0 % bodi j is not ground
-              % solve for position
-              new_q = [this.q_i;this.q_j];
-              for h=1:itCountMax
-                  this.compute_cons();
-                  delta_q = this.Phi_q\this.Phi;
-                  new_q =new_q - delta_q;
-                  
-                  this.q_i = new_q(1:7);
-                  this.q_j = new_q(8:14);
-                  this.r_i=this.q_i(1:3);
-                  this.p_i=this.q_i(4:7);
-                  this.r_j=this.q_j(1:3);
-                  this.p_j=this.q_j(4:7);
-                  
-                  if norm(delta_q) < eps %check for convergence
-                      break;
-                  end
+          % solve for position
+          new_q = this.q;
+          for h=1:itCountMax
+              PhiF_q = get_PhiF_q();
+              PhiF = get_PhiF();
+              delta_q = PhiF_q\PhiF;
+              new_q =new_q - delta_q;
+              
+              this.q = new_q;
+              for k = 1:this.nb
+                  this.r(3*(k-1)+1:3*k)=this.q(7*(k-1)+1:7*(k-1)+3);
+                  this.p(4*(k-1)+1:4*k)=this.q(7*(k-1)+4:7*k);
               end
               
-              if h >= itCountMax
-                  error('Maximum number of iterations reached');
-              end
-          else %  bodi j is ground
-              new_q = this.q_i;
-              for h=1:itCountMax
-                  this.compute_cons();
-                  delta_q = this.Phi_q\this.Phi;
-                  new_q =new_q - delta_q;
-                  
-                  this.q_i = new_q(1:7);
-                  this.r_i=this.q_i(1:3);
-                  this.p_i=this.q_i(4:7);
-                  
-                  if norm(delta_q) < eps %check for convergence
-                      break;
-                  end
-              end
-              
-              if h >= itCountMax
-                  error('Maximum number of iterations reached');
+              if norm(delta_q) < eps %check for convergence
+                  break;
               end
           end
+          
+          if h >= itCountMax
+              error('Maximum number of iterations reached');
+          end
+          
       end
       
       function velocity_analysis(this)
           % Kinematic Analysis Stage 2
           
-          if this.j~=0 % bodi j is not ground
-              this.compute_cons();
-              new_dq = this.Phi_q\this.nu;
-              
-              this.dq_i = new_dq(1:7);
-              this.dq_j = new_dq(8:14);
-              this.dr_i=this.dq_i(1:3);
-              this.dp_i=this.dq_i(4:7);
-              this.dr_j=this.dq_j(1:3);
-              this.dp_j=this.dq_j(4:7);
-          else %  bodi j is ground
-              this.compute_cons();
-              new_dq = this.Phi_q\this.nu;
-              
-              this.dq_i = new_dq(1:7);
-              this.dr_i=this.dq_i(1:3);
-              this.dp_i=this.dq_i(4:7);
-              
+          PhiF_q = get_PhiF_q();
+          nuF = get_nuF();
+          new_dq = PhiF_q\nuF;
+          
+          this.dq = new_dq;
+          for k = 1:this.nb
+              this.dr(3*(k-1)+1:3*k)=this.dq(7*(k-1)+1:7*(k-1)+3);
+              this.dp(4*(k-1)+1:4*k)=this.dq(7*(k-1)+4:7*k);
           end
+          
       end
       
       function acceleration_analysis(this)
           % Kinematic Analysis Stage 3
           
-          if this.j~=0 % bodi j is not ground
-              this.compute_cons();
-              new_ddq = this.Phi_q\this.gamma;
-              
-              this.ddq_i = new_ddq(1:7);
-              this.ddq_j = new_ddq(8:14);
-              this.ddr_i=this.ddq_i(1:3);
-              this.ddp_i=this.ddq_i(4:7);
-              this.ddr_j=this.ddq_j(1:3);
-              this.ddp_j=this.ddq_j(4:7);
-          else %  bodi j is ground
-              this.compute_cons();
-              new_ddq = this.Phi_q\this.gamma;
-              
-              this.ddq_i = new_ddq(1:7);
-              this.ddr_i=this.ddq_i(1:3);
-              this.ddp_i=this.ddq_i(4:7);
+          PhiF_q = get_PhiF_q();
+          gammaF = get_gammaF();
+          new_ddq = PhiF_q\gammaF;
+          
+          this.ddq = new_ddq;
+          for k = 1:this.nb
+              this.ddr(3*(k-1)+1:3*k)=this.ddq(7*(k-1)+1:7*(k-1)+3);
+              this.ddp(4*(k-1)+1:4*k)=this.ddq(7*(k-1)+4:7*k);
           end
+
       end
       
       function torques = inverse_dynamics(this,t_start,t_step,t_end)
@@ -256,41 +478,40 @@ classdef simEngine3D < handle
               % STEP 2: solve for lagrange multiplier
               
               % Compute the needed matrices
-              this.compute_cons();
               M = this.computeM();
               J_p = this.computeJ_p();
               P = this.computeP();
               F = this.computeF();
               tau_caret = this.compute_tau_caret();
-              Phi_r = this.Phi_q(1:this.nc,1:3*(this.nb-1));
-              Phi_p = this.Phi_q(1:this.nc,3*(this.nb-1)+1:end);
+              PhiK_r = this.get_PhiK_r();
+              PhiK_p = this.get_PhiK_p();
               
               % Build the matrix for inverse dynamics
               % Left
-              L = [zeros(3*(this.nb-1),this.nb-1) Phi_r';...
-                   P' Phi_p']; 
-              %right
-              R = -[M*this.ddr_i - F;...
-                    J_p*this.ddp_i - tau_caret];  % need to update when there are more bodies
+              L = [zeros(3*this.nb,this.nb) PhiK_r';...
+                   P' PhiK_p']; 
+              % Right
+              R = -[M*this.ddr - F;...
+                    J_p*this.ddp - tau_caret]; 
                 
               lambda_comb = L\R;
-              lambda_p = lambda_comb(1:this.nb-1);
-              lambda = lambda_comb(this.nb:end);
+              this.lambda_p = lambda_comb(1:this.nb);
+              this.lambda = lambda_comb(this.nb+1:end);
                                         
               % STEP 3: recover the forces/torques
               
-              torques{k} = cell(this.nc,this.nb-1);
-              for h = 1:this.nb-1
-                  Phi_p_h = Phi_p(:,(4*h-3):4*h);
-                  G = p2G(this.p_i); % need to update when there are more bodies
-                  for hh = 1:this.nc
-                      torques{k}{hh,h} = -1/2*G*Phi_p_h(hh,:)'*lambda(hh);
+              torques{k} = cell(this.nc,this.nb);
+              for h = 1:this.nb
+                  PhiK_p_h = PhiK_p(:,(4*h-3):4*h);
+                  G = p2G(this.p(4*(h-1)+1:4*h));
+                  for i = 1:this.nc
+                      torques{k}{i,h} = -1/2*G*PhiK_p_h(i,:)'*this.lambda(i);
                   end
               end
           end
       end
       
-      
+
       function results = dynamic_analysis(this,t_start,t_step,t_end,BDF_order)
           % This function perform a dynamic analysis using a Quasi-Newton approach
           
@@ -307,27 +528,28 @@ classdef simEngine3D < handle
           %%% Second, need to compute initial acceleration %%%
           this.compute_acceleration();
           
-          this.compute_cons();
           results{k}.time = this.t;
-          results{k}.r = [this.r_i];
-          results{k}.dr = [this.dr_i];
-          results{k}.ddr = [this.ddr_i];
-          results{k}.p = [this.p_i];
-          results{k}.dp = [this.dp_i];
-          results{k}.ddp = [this.ddp_i];
+          results{k}.r = this.r;
+          results{k}.dr = this.dr;
+          results{k}.ddr = this.ddr;
+          results{k}.p = this.p;
+          results{k}.dp = this.dp;
+          results{k}.ddp = this.ddp;
           results{k}.lambda_p = this.lambda_p;
           results{k}.lambda = this.lambda;
-          results{k}.torques = cell(this.nc,this.nb-1);
-          Phi_r = this.Phi_q(1:this.nc,1:3*(this.nb-1));
-          Phi_p = this.Phi_q(1:this.nc,3*(this.nb-1)+1:end);
-          for h = 1:this.nb-1
-              Phi_p_h = Phi_p(:,(4*h-3):4*h);
-              G = p2G(this.p_i); % need to update when there are more bodies
-              for hh = 1:this.nc
-                  results{k}.torques{hh,h} = -1/2*G*Phi_p_h(hh,:)'*this.lambda(hh);
+          results{k}.torques = cell(this.nc,this.nb);
+          
+          PhiK_r = this.get_PhiK_r();
+          PhiK_p = this.get_PhiK_p();
+          nuK = this.get_nuK();
+          for h = 1:this.nb
+              PhiK_p_h = PhiK_p(:,(4*h-3):4*h);
+              G = p2G(this.p(4*(h-1)+1:4*h));
+              for i = 1:this.nc
+                  results{k}.torques{i,h} = -1/2*G*PhiK_p_h(i,:)'*this.lambda(i);
               end
           end
-          results{k}.violation_vel = Phi_r*this.dr_i + Phi_p*this.dp_i - this.nu(1:this.nc); % need to update when there are more bodies
+          results{k}.violation_vel = PhiK_r*this.dr + PhiK_p*this.dp - nuK;
           
           
           %%% Third, apply BDF to solve the dynamic problem %%%
@@ -336,54 +558,56 @@ classdef simEngine3D < handle
           this.t = time; % update system time to t_0
           this.BDF_solve_dynamic(1,t_step,results,k); % BDF method of order 1
           
-          this.compute_cons();
           results{k}.time = this.t;
-          results{k}.r = [this.r_i];
-          results{k}.dr = [this.dr_i];
-          results{k}.ddr = [this.ddr_i];
-          results{k}.p = [this.p_i];
-          results{k}.dp = [this.dp_i];
-          results{k}.ddp = [this.ddp_i];
+          results{k}.r = this.r;
+          results{k}.dr = this.dr;
+          results{k}.ddr = this.ddr;
+          results{k}.p = this.p;
+          results{k}.dp = this.dp;
+          results{k}.ddp = this.ddp;
           results{k}.lambda_p = this.lambda_p;
           results{k}.lambda = this.lambda;
-          results{k}.torques = cell(this.nc,this.nb-1);
-          Phi_r = this.Phi_q(1:this.nc,1:3*(this.nb-1));
-          Phi_p = this.Phi_q(1:this.nc,3*(this.nb-1)+1:end);
-          for h = 1:this.nb-1
-              Phi_p_h = Phi_p(:,(4*h-3):4*h);
-              G = p2G(this.p_i); % need to update when there are more bodies
-              for hh = 1:this.nc
-                  results{k}.torques{hh,h} = -1/2*G*Phi_p_h(hh,:)'*this.lambda(hh);
+          results{k}.torques = cell(this.nc,this.nb);
+          
+          PhiK_r = this.get_PhiK_r();
+          PhiK_p = this.get_PhiK_p();
+          nuK = this.get_nuK();
+          for h = 1:this.nb
+              PhiK_p_h = PhiK_p(:,(4*h-3):4*h);
+              G = p2G(this.p(4*(h-1)+1:4*h));
+              for i = 1:this.nc
+                  results{k}.torques{i,h} = -1/2*G*PhiK_p_h(i,:)'*this.lambda(i);
               end
           end
-          results{k}.violation_vel = Phi_r*this.dr_i + Phi_p*this.dp_i - this.nu(1:this.nc); % need to update when there are more bodies
+          results{k}.violation_vel = PhiK_r*this.dr + PhiK_p*this.dp - nuK;
           
           for k=3:counts
               time = t_start + (k-1)*t_step;
               this.t = time; % update system time to t_0
               this.BDF_solve_dynamic(BDF_order,t_step,results,k); % BDF method of order 2
               
-              this.compute_cons();
               results{k}.time = this.t;
-              results{k}.r = [this.r_i];
-              results{k}.dr = [this.dr_i];
-              results{k}.ddr = [this.ddr_i];
-              results{k}.p = [this.p_i];
-              results{k}.dp = [this.dp_i];
-              results{k}.ddp = [this.ddp_i];
+              results{k}.r = this.r;
+              results{k}.dr = this.dr;
+              results{k}.ddr = this.ddr;
+              results{k}.p = this.p;
+              results{k}.dp = this.dp;
+              results{k}.ddp = this.ddp;
               results{k}.lambda_p = this.lambda_p;
               results{k}.lambda = this.lambda;
-              results{k}.torques = cell(this.nc,this.nb-1);
-              Phi_r = this.Phi_q(1:this.nc,1:3*(this.nb-1));
-              Phi_p = this.Phi_q(1:this.nc,3*(this.nb-1)+1:end);
-              for h = 1:this.nb-1
-                  Phi_p_h = Phi_p(:,(4*h-3):4*h);
-                  G = p2G(this.p_i); % need to update when there are more bodies
-                  for hh = 1:this.nc
-                      results{k}.torques{hh,h} = -1/2*G*Phi_p_h(hh,:)'*this.lambda(hh);
+              results{k}.torques = cell(this.nc,this.nb);
+              
+              PhiK_r = this.get_PhiK_r();
+              PhiK_p = this.get_PhiK_p();
+              nuK = this.get_nuK();
+              for h = 1:this.nb
+                  PhiK_p_h = PhiK_p(:,(4*h-3):4*h);
+                  G = p2G(this.p(4*(h-1)+1:4*h));
+                  for i = 1:this.nc
+                      results{k}.torques{i,h} = -1/2*G*PhiK_p_h(i,:)'*this.lambda(i);
                   end
               end
-              results{k}.violation_vel = Phi_r*this.dr_i + Phi_p*this.dp_i - this.nu(1:this.nc); % need to update when there are more bodies
+              results{k}.violation_vel = PhiK_r*this.dr + PhiK_p*this.dp - nuK;
           end
           
           
@@ -395,26 +619,26 @@ classdef simEngine3D < handle
           
           eps = 1e-3;
           
-          this.compute_cons();
-          Phi_r = this.Phi_q(1:this.nc,1:3*(this.nb-1));
-          Phi_p = this.Phi_q(1:this.nc,3*(this.nb-1)+1:end);
-          P = this.computeP();
-          
-          if max(abs(this.Phi))>eps
+          PhiK = this.get_PhiK();
+          if max(abs(PhiK))>eps
               error("level 0 constraint is not satisfied");
           end
           
-          for k=1:this.nb-1
-              if abs(this.p_i'*this.p_i-1)>eps   % need to update when there are more bodies
+          for k=1:this.nb
+              if abs(this.p(4*(k-1)+1:4*k)'*this.p(4*(k-1)+1:4*k)-1)>eps 
                   error("level 0 constraint is not satisfied");
               end
           end
           
-          if max(abs(Phi_r*this.dr_i+Phi_p*this.dp_i - this.nu(1:this.nc)))>eps % need to update when there are more bodies
+          PhiK_r = this.get_PhiK_r();
+          PhiK_p = this.get_PhiK_p();
+          nuK = this.get_nuK();
+          if max(abs(PhiK_r*this.dr+PhiK_p*this.dp - nuK))>eps
               error("level 1 constraint is not satisfied");
           end
           
-          if max(abs(P*this.dp_i))>eps 
+          P = this.computeP();
+          if max(abs(P*this.dp))>eps 
               error("level 1 constraint is not satisfied");
           end
               
@@ -423,34 +647,36 @@ classdef simEngine3D < handle
       function compute_acceleration(this)
           % This function solve the initial acceleration using EOM and two
           % constraint equations
-          
-          this.compute_cons();
+
           M = this.computeM();
           J_p = this.computeJ_p();
           P = this.computeP();
           F = this.computeF();
           tau_caret = this.compute_tau_caret();
-          Phi_r = this.Phi_q(1:this.nc,1:3*(this.nb-1));
-          Phi_p = this.Phi_q(1:this.nc,3*(this.nb-1)+1:end);
-          gamma_p = this.gamma(this.nc+1:end);
-          gamma_caret = this.gamma(1:this.nc);
+          PhiK_r = this.get_PhiK_r();
+          PhiK_p = this.get_PhiK_p();
+          gammaP = this.get_gammaP();
+          gammaK = this.get_gammaK();
           % Left matrix
-          L = [M  zeros(3*(this.nb-1),4*(this.nb-1))  zeros(3*(this.nb-1),(this.nb-1))  Phi_r';
-               zeros(4*(this.nb-1),3*(this.nb-1))  J_p  P'  Phi_p';
-               zeros((this.nb-1),3*(this.nb-1))  P  zeros(this.nb-1)  zeros((this.nb-1),this.nc);
-               Phi_r  Phi_p  zeros(this.nc,(this.nb-1))  zeros(this.nc) ];
+          L = [M  zeros(3*this.nb,4*this.nb)  zeros(3*this.nb,this.nb)  PhiK_r';
+               zeros(4*this.nb,3*this.nb)  J_p  P'  PhiK_p';
+               zeros(this.nb,3*this.nb)  P  zeros(this.nb)  zeros((this.nb),this.nc);
+               PhiK_r  PhiK_p  zeros(this.nc,this.nb)  zeros(this.nc) ];
           
           % Right matrix
-          R = [F; tau_caret; gamma_p; gamma_caret];
+          R = [F; tau_caret; gammaP; gammaK];
           
           unknown = L\R;
           
           % need to update when there are more bodies
-          this.ddr_i = unknown(1:3*(this.nb-1));
-          this.ddp_i = unknown(3*(this.nb-1)+1:7*(this.nb-1));
-          this.ddq_i = [this.ddr_i; this.ddp_i];
-          this.lambda_p = unknown(7*(this.nb-1)+1:8*(this.nb-1));
-          this.lambda = unknown(8*(this.nb-1)+1:end);
+          this.ddr = unknown(1:3*this.nb);
+          this.ddp = unknown(3*this.nb+1:7*this.nb);
+          for k = 1:this.nb
+              this.ddq(7*(k-1)+1:7*(k-1)+3) = this.ddr(3*(k-1)+1:3*k);
+              this.ddq(7*(k-1)+4:7*k) = this.ddp(4*(k-1)+1:4*k);
+          end
+          this.lambda_p = unknown(7*this.nb+1:8*this.nb);
+          this.lambda = unknown(8*this.nb+1:end);
       end
       
       function BDF_solve_dynamic(this,BDF_order,step_size,recent_solution,n)
@@ -472,7 +698,7 @@ classdef simEngine3D < handle
                   
               case 2
                   s1 = recent_solution{n-1}; % most recent solution
-                  s2 = recent_solution{n-2};
+                  s2 = recent_solution{n-2}; % second most recent solution
                   beta = 2/3;
                   a1 = -4/3;
                   a2 = 1/3;
@@ -487,9 +713,12 @@ classdef simEngine3D < handle
           
           %%% Stage 0: prime new time step %%%
           
-          this.ddr_i = s1.ddr;
-          this.ddp_i = s1.ddp;
-          this.ddq_i = [this.ddr_i;this.ddp_i];
+          this.ddr = s1.ddr;
+          this.ddp = s1.ddp;
+          for i = 1:this.nb
+              this.ddq(7*(i-1)+1:7*(i-1)+3) = this.ddr(3*(i-1)+1:3*i);
+              this.ddq(7*(i-1)+4:7*i) = this.ddp(4*(i-1)+1:4*i);
+          end
           this.lambda_p = s1.lambda_p;
           this.lambda  = s1.lambda;
           
@@ -497,48 +726,58 @@ classdef simEngine3D < handle
               
               %%% Stage 1: compute position and velocity using BDF and most recent accelerations %%%
               
-              this.r_i = C_r + beta^2*h^2*this.ddr_i;
-              this.dr_i = C_r_dot + beta*h*this.ddr_i;
-              this.p_i = C_p + beta^2*h^2*this.ddp_i;
-              this.dp_i = C_p_dot + beta*h*this.ddp_i;
-              this.q_i = [this.r_i;this.p_i];
-              this.dq_i = [this.dr_i;this.dp_i];
+              this.r = C_r + beta^2*h^2*this.ddr;
+              this.dr = C_r_dot + beta*h*this.ddr;
+              this.p = C_p + beta^2*h^2*this.ddp;
+              this.dp = C_p_dot + beta*h*this.ddp;
+              for i = 1:this.nb
+                  this.q(7*(i-1)+1:7*(i-1)+3) = this.r(3*(i-1)+1:3*i);
+                  this.q(7*(i-1)+4:7*i) = this.p(4*(i-1)+1:4*i);
+              end
+              for i = 1:this.nb
+                  this.dq(7*(i-1)+1:7*(i-1)+3) = this.dr(3*(i-1)+1:3*i);
+                  this.dq(7*(i-1)+4:7*i) = this.dp(4*(i-1)+1:4*i);
+              end
               
               %%% Stage 2: compute the residual %%%
               
-              this.compute_cons();
               M = this.computeM();
               J_p = this.computeJ_p();
               P = this.computeP();
               F = this.computeF();
               tau_caret = this.compute_tau_caret();
-              Phi_r = this.Phi_q(1:this.nc,1:3*(this.nb-1));
-              Phi_p = this.Phi_q(1:this.nc,3*(this.nb-1)+1:end);
+              PhiK_r = this.get_PhiK_r();
+              PhiK_p = this.get_PhiK_p();
+              PhiP = this.get_PhiP();
+              PhiK = this.get_PhiK();
               
-              g = [M*this.ddr_i + Phi_r'*this.lambda - F;
-                  J_p*this.ddp_i + Phi_p'*this.lambda + P'*this.lambda_p - tau_caret;
-                  this.Phi(this.nc+1:end)/(beta^2*h^2);
-                  this.Phi(1:this.nc)/(beta^2*h^2)];
+              g = [M*this.ddr + PhiK_r'*this.lambda - F;
+                  J_p*this.ddp + PhiK_p'*this.lambda + P'*this.lambda_p - tau_caret;
+                  PhiP/(beta^2*h^2);
+                  PhiK/(beta^2*h^2)];
               
               %%% Stage 3: solve linear system to get correction %%%
               
               % use Quasi Newton
               if k == 1
-                  Psi = [M  zeros(3*(this.nb-1),4*(this.nb-1))  zeros(3*(this.nb-1),(this.nb-1))  Phi_r';
-                        zeros(4*(this.nb-1),3*(this.nb-1))  J_p  P'  Phi_p';
-                        zeros((this.nb-1),3*(this.nb-1))  P  zeros(this.nb-1)  zeros((this.nb-1),this.nc);
-                        Phi_r  Phi_p  zeros(this.nc,(this.nb-1))  zeros(this.nc) ]; % approximate the Jacobian
+                  Psi = [M  zeros(3*this.nb,4*this.nb)  zeros(3*this.nb,this.nb)  PhiK_r';
+                        zeros(4*this.nb,3*this.nb)  J_p  P'  PhiK_p';
+                        zeros(this.nb,3*this.nb)  P  zeros(this.nb)  zeros(this.nb,this.nc);
+                        PhiK_r  PhiK_p  zeros(this.nc,this.nb)  zeros(this.nc) ]; % approximate the Jacobian
               end
               
               delta = Psi\-g;
               
               %%% Stage 4: improve the quality of approximate solution %%%
               
-              this.ddr_i   = this.ddr_i + delta(1:3*(this.nb-1));
-              this.ddp_i   = this.ddp_i + delta(3*(this.nb-1)+1:7*(this.nb-1));
-              this.ddq_i = [this.ddr_i;this.ddp_i];
-              this.lambda_p = this.lambda_p + delta(7*(this.nb-1)+1:8*(this.nb-1));
-              this.lambda  = this.lambda + delta(8*(this.nb-1)+1:end);
+              this.ddr   = this.ddr + delta(1:3*this.nb);
+              this.ddp   = this.ddp + delta(3*this.nb+1:7*this.nb);
+              for i = 1:this.nb
+                  this.ddq(7*(i-1)+1:7*(i-1)+3) = this.ddr(3*(i-1)+1:3*i);
+                  this.ddq(7*(i-1)+4:7*i) = this.ddp(4*(i-1)+1:4*i);
+              end
+              this.lambda_p = this.lambda_p + delta(7*this.nb+1:8*this.nb);
+              this.lambda  = this.lambda + delta(8*this.nb+1:end);
               
               %%% Stage 5: Go to Stage 6 if norm(delta) is small otherwise go back to stage 1 %%%
               
@@ -554,12 +793,18 @@ classdef simEngine3D < handle
           
           %%% Stage 6: get level 0 and level 1 variables %%%
           
-          this.r_i     = C_r + beta^2*h^2*this.ddr_i;
-          this.p_i     = C_p + beta^2*h^2*this.ddp_i;
-          this.dr_i  = C_r_dot + beta*h*this.ddr_i;
-          this.dp_i  = C_p_dot + beta*h*this.ddp_i;
-          this.q_i = [this.r_i;this.p_i];
-          this.dq_i = [this.dr_i;this.dp_i];
+          this.r     = C_r + beta^2*h^2*this.ddr;
+          this.p     = C_p + beta^2*h^2*this.ddp;
+          this.dr  = C_r_dot + beta*h*this.ddr;
+          this.dp  = C_p_dot + beta*h*this.ddp;
+          for i = 1:this.nb
+              this.q(7*(i-1)+1:7*(i-1)+3) = this.r(3*(i-1)+1:3*i);
+              this.q(7*(i-1)+4:7*i) = this.p(4*(i-1)+1:4*i);
+          end
+          for i = 1:this.nb
+              this.dq(7*(i-1)+1:7*(i-1)+3) = this.dr(3*(i-1)+1:3*i);
+              this.dq(7*(i-1)+4:7*i) = this.dp(4*(i-1)+1:4*i);
+          end
           
       end
       
@@ -568,44 +813,44 @@ classdef simEngine3D < handle
       
       function M = computeM(this)
          % compute the mass matrix
-         M = zeros(3*(this.nb-1),3*(this.nb-1)); % -1 because body 2 is ground
-         for k = 1:this.nb-1
+         M = zeros(3*this.nb,3*this.nb);
+         for k = 1:this.nb
              M(3*k-2:3*k, 3*k-2:3*k) = this.body(k).mass*eye(3);
          end
       end
       
       function J_p = computeJ_p(this)
           % compute the inertia matrix
-          J_p = zeros(4*(this.nb-1),4*(this.nb-1)); % -1 because body 2 is ground
-          for k = 1:this.nb-1
-             G = p2G(this.p_i); % need to update when there are more bodies
+          J_p = zeros(4*this.nb,4*this.nb);
+          for k = 1:this.nb
+             G = p2G(this.p(4*(k-1)+1:4*k));
              J_p(4*k-3:4*k, 4*k-3:4*k) = 4*G'*this.body(k).inertia*G;
          end
       end
           
       function P = computeP(this)
           % compute the P matrix
-          P = zeros(this.nb-1,4*(this.nb-1));
-          for k = 1:this.nb-1
-              P(k, 4*k-3:4*k) = this.p_i'; % need to update when there are more bodies
+          P = zeros(this.nb,4*this.nb);
+          for k = 1:this.nb
+              P(k, 4*k-3:4*k) = this.p(4*(k-1)+1:4*k)';
           end
       end
          
       function F = computeF(this)
           % compute the F vector
-          F = zeros(3*(this.nb-1),1);
-          for k = 1:this.nb-1
+          F = zeros(3*this.nb,1);
+          for k = 1:this.nb
               F(3*k-2:3*k) = this.body(k).force; % total force acting on each body
           end
       end
       
       function tau_caret = compute_tau_caret(this)
           % compute the tau_caret vector
-          tau_caret = zeros(4*(this.nb-1),1);
-          for k = 1:this.nb-1
-              G = p2G(this.p_i); % need to update when there are more bodies
-              dG = p2G(this.dp_i); % need to update when there are more bodies
-              tau_caret(4*k-3:4*k) = 2*G'*this.body(k).torque + 8*dG'*this.body(k).inertia*dG*this.p_i; % total torque acting on each body
+          tau_caret = zeros(4*this.nb,1);
+          for k = 1:this.nb
+              G = p2G(this.p(4*(k-1)+1:4*k));
+              dG = p2G(this.dp(4*(k-1)+1:4*k));
+              tau_caret(4*k-3:4*k) = 2*G'*this.body(k).torque + 8*dG'*this.body(k).inertia*dG*this.p(4*(k-1)+1:4*k); % total torque acting on each body
           end
       end
      
