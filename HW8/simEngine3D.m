@@ -20,18 +20,6 @@ classdef simEngine3D < handle
         nc; % number of kinematic constraints (not including Euler parameter normalization constraint)
         constraints; % collection of kinematic constraints
         t; % current time in system
-%         PhiF; % overall constarints set
-%         PhiF_q; % jacobian matrix of PhiF
-%         PhiK; % kinematic constraints set
-%         PhiK_r; % jacobian matrix of PhiK
-%         PhiK_p; % jacobian matrix of PhiK
-%         PhiP; % Euler parameter normalization constraints
-%         nuF; % right hand side of velocity eqaution for overall constarints
-%         nuK; % right hand side of velocity eqaution for kinematic constarints
-%         nuP; % right hand side of velocity eqaution for Euler parameter normalization constarints
-%         gammaF; % right hand side of acceleration eqaution for overall constarints
-%         gammaK; % right hand side of acceleration eqaution for kinematic constarints
-%         gammaP; % right hand side of acceleration eqaution for Euler parameter normalization constarints
         lambda_p; % lagrange multipliers from Euler parameter normalization constarints
         lambda; % lagrange multipliers from kinematic constarints
     end
