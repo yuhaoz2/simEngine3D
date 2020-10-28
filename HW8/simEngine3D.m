@@ -343,8 +343,8 @@ classdef simEngine3D < handle
       function PhiF_q = get_PhiF_q(this)
           % jacobian matrix of PhiF
           PhiF_q = zeros(this.nc + this.nb,7*this.nb);
-          PhiK_p = get_PhiK_p();
-          PhiK_r = get_PhiK_r();
+          PhiK_p = this.get_PhiK_p();
+          PhiK_r = this.get_PhiK_r();
           
           for i = 1:this.nb
               PhiF_q(1:this.nc,7*(i-1)+1:7*(i-1)+3) = PhiK_r(:,3*(i-1)+1:3*i);
@@ -392,8 +392,8 @@ classdef simEngine3D < handle
           % solve for position
           new_q = this.q;
           for h=1:itCountMax
-              PhiF_q = get_PhiF_q();
-              PhiF = get_PhiF();
+              PhiF_q = this.get_PhiF_q();
+              PhiF = this.get_PhiF();
               delta_q = PhiF_q\PhiF;
               new_q =new_q - delta_q;
               
@@ -417,8 +417,8 @@ classdef simEngine3D < handle
       function velocity_analysis(this)
           % Kinematic Analysis Stage 2
           
-          PhiF_q = get_PhiF_q();
-          nuF = get_nuF();
+          PhiF_q = this.get_PhiF_q();
+          nuF = this.get_nuF();
           new_dq = PhiF_q\nuF;
           
           this.dq = new_dq;
@@ -432,8 +432,8 @@ classdef simEngine3D < handle
       function acceleration_analysis(this)
           % Kinematic Analysis Stage 3
           
-          PhiF_q = get_PhiF_q();
-          gammaF = get_gammaF();
+          PhiF_q = this.get_PhiF_q();
+          gammaF = this.get_gammaF();
           new_ddq = PhiF_q\gammaF;
           
           this.ddq = new_ddq;

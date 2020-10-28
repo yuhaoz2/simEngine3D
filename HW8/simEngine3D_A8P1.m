@@ -83,7 +83,7 @@ ylabel('2-norm of violation');
 
 p = zeros(4,length(results));
 dp = zeros(4,length(results));
-omega = zeros(4,length(results));
+omega = zeros(3,length(results));
 
 for k = 1:length(results)
     % compute orientation matrix
