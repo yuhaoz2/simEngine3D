@@ -70,7 +70,7 @@ ylabel('z coordinate (m)');
 
 vio = zeros(1,length(results));
 for k = 1:length(results)
-    vio(k) = norm(results{k}.violation_vel); % position of O'
+    vio(k) = norm(results{k}.violation_vel);
 end
 
 figure
@@ -81,9 +81,9 @@ ylabel('2-norm of violation');
 
 % Plot the angular velocity of Body 1
 
-p = zeros(3,length(results));
-dp = zeros(3,length(results));
-omega = zeros(3,length(results));
+p = zeros(4,length(results));
+dp = zeros(4,length(results));
+omega = zeros(4,length(results));
 
 for k = 1:length(results)
     % compute orientation matrix

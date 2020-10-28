@@ -24,37 +24,113 @@ t = t_start:t_step:t_end;
 
 %% Plots
 
-% Plot coordiantes of point O'
+% Plot coordiantes of Body 1's point O'
 
-r = zeros(3,length(results));
+r = zeros(6,length(results));
 for k = 1:length(results)
-    r(:,k) = results{k}.r; % position of O'
+    r(:,k) = results{k}.r; % position of Body 1's and Body 2's O' 
 end
 
 figure 
 subplot(3,1,1)
 plot(t,r(1,:));
-title('x coordinate function plot of point O`');
+title('x coordinate function plot of Body 1`s point O`');
 xlabel('Time (sec)');
 ylabel('x coordinate (m)');
 
 subplot(3,1,2)
 plot(t,r(2,:));
-title('y coordinate function plot of point O`');
+title('y coordinate function plot of Body 1`s point O`');
 xlabel('Time (sec)');
 ylabel('y coordinate (m)');
 
 subplot(3,1,3)
 plot(t,r(3,:));
-title('z coordinate function plot of point O`');
+title('z coordinate function plot of Body 1`s point O`');
 xlabel('Time (sec)');
 ylabel('z coordinate (m)');
 
-% Plot the 2-norm of the violation of the velocity constraint equations
+% Plot coordiantes of Body 2's point O'
+
+figure 
+subplot(3,1,1)
+plot(t,r(4,:));
+title('x coordinate function plot of Body 2`s point O`');
+xlabel('Time (sec)');
+ylabel('x coordinate (m)');
+
+subplot(3,1,2)
+plot(t,r(5,:));
+title('y coordinate function plot of Body 2`s point O`');
+xlabel('Time (sec)');
+ylabel('y coordinate (m)');
+
+subplot(3,1,3)
+plot(t,r(6,:));
+title('z coordinate function plot of Body 2`s point O`');
+xlabel('Time (sec)');
+ylabel('z coordinate (m)');
+
+% Plot the angular velocity of Body 1 and Body 2
+
+p = zeros(8,length(results));
+dp = zeros(8,length(results));
+omega1 = zeros(3,length(results));
+omega2 = zeros(3,length(results));
+
+for k = 1:length(results)
+    % compute orientation matrix
+    p     = results{k}.p; 
+    dp    = results{k}.dp; 
+
+    omega1(:,k) = 2*p2E(p(1:4))*dp(1:4);
+    omega2(:,k) = 2*p2E(p(5:8))*dp(5:8);
+end
+
+figure 
+subplot(3,1,1)
+plot(t,omega1(1,:));
+title('Plot of Body 1`s angular velocity in G-RF x axis');
+xlabel('Time (sec)');
+ylabel('omega_x (rad/s)');
+
+subplot(3,1,2)
+plot(t,omega1(2,:));
+title('Plot of Body 1`s angular velocity in G-RF y axis');
+xlabel('Time (sec)');
+ylabel('omega_y (rad/s)');
+
+subplot(3,1,3)
+plot(t,omega1(3,:));
+title('Plot of Body 1`s angular velocity in G-RF z axis');
+xlabel('Time (sec)');
+ylabel('omega_z (rad/s)');
+
+figure 
+subplot(3,1,1)
+plot(t,omega2(1,:));
+title('Plot of Body 2`s angular velocity in G-RF x axis');
+xlabel('Time (sec)');
+ylabel('omega_x (rad/s)');
+
+subplot(3,1,2)
+plot(t,omega2(2,:));
+title('Plot of Body 2`s angular velocity in G-RF y axis');
+xlabel('Time (sec)');
+ylabel('omega_y (rad/s)');
+
+subplot(3,1,3)
+plot(t,omega2(3,:));
+title('Plot of Body 2`s angular velocity in G-RF z axis');
+xlabel('Time (sec)');
+ylabel('omega_z (rad/s)');
+
+
+% Plot the 2-norm of the violation of the velocity constraint equations for the revolute joint between Body 1 and Body 2
 
 vio = zeros(1,length(results));
 for k = 1:length(results)
-    vio(k) = norm(results{k}.violation_vel); % position of O'
+    vio(k) = norm(results{k}.violation_vel(6:10));
 end
 
 figure
@@ -62,36 +138,3 @@ plot(t,vio);
 title('2-norm of the violation of the velocity constraint equations');
 xlabel('Time (sec)');
 ylabel('2-norm of violation');
-
-% Plot the angular velocity of Body 1
-
-p = zeros(3,length(results));
-dp = zeros(3,length(results));
-omega = zeros(3,length(results));
-
-for k = 1:length(results)
-    % compute orientation matrix
-    p     = results{k}.p; 
-    dp    = results{k}.dp; 
-
-    omega(:,k) = 2*p2E(p)*dp;
-end
-
-figure 
-subplot(3,1,1)
-plot(t,omega(1,:));
-title('Plot of angular velocity in G-RF x axis');
-xlabel('Time (sec)');
-ylabel('omega_x (rad/s)');
-
-subplot(3,1,2)
-plot(t,omega(2,:));
-title('Plot of angular velocity in G-RF y axis');
-xlabel('Time (sec)');
-ylabel('omega_y (rad/s)');
-
-subplot(3,1,3)
-plot(t,omega(3,:));
-title('Plot of angular velocity in G-RF z axis');
-xlabel('Time (sec)');
-ylabel('omega_z (rad/s)');
